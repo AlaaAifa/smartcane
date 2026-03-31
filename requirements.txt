@@ -1,0 +1,8 @@
+# Backend Dependencies
+fastapi
+uvicorn[standard]
+pydantic[email]
+python-multipart
+
+# Testing / Client Dependencies
+requests

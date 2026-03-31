@@ -1,0 +1,42 @@
+{
+  "user_id": "user_789456123",
+  "nom": "Ben Slama",
+  "prenom": "Mohamed",
+  "birthday": "1985-06-15",
+  "email": "m.benslama@example.com",
+  "phone_number_malvoyant": "+216 20 123 456",
+  "phone_number_famille": "+216 55 987 654",
+  "address": {
+    "city": "Tunis",
+    "street": "Avenue Habib Bourguiba",
+    "postal_code": "1000"
+  },
+  "subscription": {
+    "plan": "Annual Premium",
+    "start_date": "2026-01-01",
+    "expiry_date": "2026-12-31",
+    "status": "active"
+  },
+  "cane_details": {
+    "serial_number": "SC-2026-X89",
+    "firmware_version": "v1.2.0",
+    "last_sync": "2026-03-31T15:30:00Z"
+  },
+  "emergency_contacts": [
+    {
+      "name": "Sarah Ben Slama",
+      "relation": "Spouse",
+      "phone": "+216 55 987 654"
+    },
+    {
+      "name": "Ahmed Ben Slama",
+      "relation": "Brother",
+      "phone": "+216 98 111 222"
+    }
+  ],
+  "medical_info": {
+    "blood_group": "A+",
+    "condition": "Visual Impairment",
+    "notes": "No other known allergies"
+  }
+}

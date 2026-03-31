@@ -1,0 +1,6 @@
+fastapi
+uvicorn[standard]
+pydantic[email]
+python-multipart
+# Added for test_backend.py
+requests
