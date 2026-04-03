@@ -76,6 +76,16 @@ class ApiService {
     return false;
   }
 
+  static Future<bool> updateUser(Map<String, dynamic> user) async {
+    try {
+      final res = await http.post(Uri.parse("$baseUrl/users"), headers: _headers, body: jsonEncode(user));
+      return res.statusCode == 200;
+    } catch (e) {
+      print("Update user error: $e");
+    }
+    return false;
+  }
+
   // --- Alerts ---
   static Future<List<Map<String, dynamic>>> getActiveAlerts() async {
     try {
@@ -95,6 +105,16 @@ class ApiService {
       print("History error: $e");
     }
     return [];
+  }
+
+  static Future<bool> clearAlertHistory() async {
+    try {
+      final res = await http.delete(Uri.parse("$baseUrl/alerts/history"), headers: _headers);
+      return res.statusCode == 200;
+    } catch (e) {
+      print("Clear history error: $e");
+    }
+    return false;
   }
 
   static Future<bool> resolveAlert(String alertId) async {

@@ -25,16 +25,18 @@ db_staff: Dict[str, StaffUser] = {}
 db_staff["admin_001"] = StaffUser(
     staff_id="admin_001",
     name="Admin Principal",
-    email="admin@smartcane.com",
-    password="admin123",
-    role="admin"
+    email="alaa@gmail.com",
+    password="123456",
+    role="admin",
+    shift="matin"
 )
 db_staff["staff_001"] = StaffUser(
     staff_id="staff_001",
     name="Mohamed Ben Ali",
     email="staff@smartcane.com",
     password="staff123",
-    role="staff"
+    role="staff",
+    shift="soir"
 )
 
 # Seed demo users
@@ -46,7 +48,10 @@ db_users["user_001"] = UserDocument(
     email="m.benslama@example.com",
     phone_number_malvoyant="+216 20 123 456",
     phone_number_famille="+216 55 987 654",
-    status="normal"
+    status="normal",
+    is_online=True,
+    latitude=36.8065,
+    longitude=10.1815
 )
 db_users["user_002"] = UserDocument(
     user_id="user_002",
@@ -56,7 +61,10 @@ db_users["user_002"] = UserDocument(
     email="f.trabelsi@example.com",
     phone_number_malvoyant="+216 22 333 444",
     phone_number_famille="+216 55 111 222",
-    status="normal"
+    status="normal",
+    is_online=False,
+    latitude=36.8190,
+    longitude=10.1660
 )
 db_users["user_003"] = UserDocument(
     user_id="user_003",
@@ -66,7 +74,10 @@ db_users["user_003"] = UserDocument(
     email="a.bouazizi@example.com",
     phone_number_malvoyant="+216 25 555 666",
     phone_number_famille="+216 98 777 888",
-    status="normal"
+    status="normal",
+    is_online=True,
+    latitude=36.7980,
+    longitude=10.1720
 )
 
 # Seed demo alerts
@@ -122,8 +133,10 @@ async def get_dashboard_stats():
     sos_count = sum(1 for a in db_alerts.values() if a.type == "SOS" and a.status == "active")
     help_count = sum(1 for a in db_alerts.values() if a.type == "HELP" and a.status == "active")
     resolved_count = sum(1 for a in db_alerts.values() if a.status == "resolved")
+    online_count = sum(1 for u in db_users.values() if u.is_online)
     return {
         "total_users": total_users,
+        "online_users": online_count,
         "active_alerts": active_alerts,
         "sos_count": sos_count,
         "help_count": help_count,
@@ -174,6 +187,13 @@ async def get_active_alerts():
 async def get_alerts_history():
     return [a for a in db_alerts.values() if a.status == "resolved"]
 
+@app.delete("/alerts/history")
+async def clear_alerts_history():
+    global db_alerts
+    # Keep only active alerts
+    db_alerts = {k: v for k, v in db_alerts.items() if v.status != "resolved"}
+    return {"status": "success", "message": "Alert history cleared"}
+
 @app.put("/alerts/{alert_id}/resolve")
 async def resolve_alert(alert_id: str, staff_id: str = "staff_001"):
     if alert_id not in db_alerts:
@@ -206,11 +226,17 @@ async def create_staff(staff: StaffUser):
 async def get_staff_performance():
     performance = {}
     for staff in db_staff.values():
-        resolved = sum(1 for a in db_alerts.values() if a.resolved_by == staff.staff_id)
+        resolved = sum(1 for a in db_alerts.values() if a.resolved_by == staff.staff_id and a.status == "resolved")
+        pending = sum(1 for a in db_alerts.values() if a.status == "active")
+        processed = resolved  # Simplification for demo
+        
         performance[staff.staff_id] = {
             "staff_name": staff.name,
             "role": staff.role,
+            "shift": staff.shift,
+            "alerts_processed": processed,
             "alerts_resolved": resolved,
+            "alerts_pending": pending,
         }
     return performance
 

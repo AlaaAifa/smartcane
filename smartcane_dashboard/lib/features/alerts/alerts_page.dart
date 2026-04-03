@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/theme.dart';
 import '../../core/api_service.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class AlertsPage extends StatefulWidget {
   final Function(String)? onNavigate;
@@ -12,17 +13,31 @@ class AlertsPage extends StatefulWidget {
 
 class _AlertsPageState extends State<AlertsPage> {
   List<Map<String, dynamic>> alerts = [];
+  Map<String, Map<String, dynamic>> usersDict = {};
   bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _loadAlerts();
+    _loadData();
   }
 
-  void _loadAlerts() async {
-    final data = await ApiService.getActiveAlerts();
-    setState(() { alerts = data; _isLoading = false; });
+  void _loadData() async {
+    final alertData = await ApiService.getActiveAlerts();
+    final usersData = await ApiService.getUsers();
+    
+    final Map<String, Map<String, dynamic>> tempDict = {};
+    for (var u in usersData) {
+      tempDict[u['user_id']] = u;
+    }
+
+    if (mounted) {
+      setState(() { 
+        alerts = alertData; 
+        usersDict = tempDict;
+        _isLoading = false; 
+      });
+    }
   }
 
   void _resolveAlert(String alertId) async {
@@ -31,7 +46,15 @@ class _AlertsPageState extends State<AlertsPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Alerte résolue !"), backgroundColor: Colors.green),
       );
-      _loadAlerts();
+      _loadData();
+    }
+  }
+
+  void _callNumber(String? number) async {
+    if (number == null || number.isEmpty) return;
+    final Uri url = Uri.parse("tel:$number");
+    if (await canLaunchUrl(url)) {
+      await launchUrl(url);
     }
   }
 
@@ -56,7 +79,7 @@ class _AlertsPageState extends State<AlertsPage> {
               const Spacer(),
               IconButton(
                 icon: const Icon(Icons.refresh),
-                onPressed: () { setState(() => _isLoading = true); _loadAlerts(); },
+                onPressed: () { setState(() => _isLoading = true); _loadData(); },
               ),
             ],
           ),
@@ -80,6 +103,8 @@ class _AlertsPageState extends State<AlertsPage> {
                     final alert = alerts[index];
                     final isSOS = alert["type"] == "SOS";
                     final color = isSOS ? AppTheme.sosRed : AppTheme.helpOrange;
+                    final user = usersDict[alert['user_id']];
+                    final userName = user != null ? "${user['prenom']} ${user['nom']}" : alert['user_id'];
 
                     return Container(
                       margin: const EdgeInsets.only(bottom: 16),
@@ -104,7 +129,7 @@ class _AlertsPageState extends State<AlertsPage> {
                               children: [
                                 Text(alert["type"], style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18, color: color)),
                                 const SizedBox(height: 4),
-                                Text("Utilisateur: ${alert['user_id']}", style: TextStyle(color: Colors.grey.shade600)),
+                                Text(userName, style: const TextStyle(fontWeight: FontWeight.bold)),
                                 Text("Position: ${alert['latitude']}, ${alert['longitude']}", style: TextStyle(color: Colors.grey.shade400, fontSize: 12)),
                               ],
                             ),
@@ -119,14 +144,51 @@ class _AlertsPageState extends State<AlertsPage> {
                                 widget.onNavigate!("/map?lat=${alert['latitude']}&lon=${alert['longitude']}&type=${alert['type']}");
                               }
                             },
-                            icon: const Icon(Icons.map, size: 18),
-                            label: const Text("Carte"),
+                            icon: const Icon(Icons.location_on, size: 18),
+                            label: const Text("Localiser"),
                           ),
+                          const SizedBox(width: 8),
+                          
+                          // Call Menu
+                          PopupMenuButton<String>(
+                            onSelected: (value) {
+                              if (value == "patient") _callNumber(user?['phone_number_malvoyant']);
+                              if (value == "famille") _callNumber(user?['phone_number_famille']);
+                            },
+                            itemBuilder: (context) => [
+                              PopupMenuItem(
+                                value: "patient",
+                                child: Row(
+                                  children: [
+                                    const Icon(Icons.person, size: 18, color: AppTheme.primary),
+                                    const SizedBox(width: 8),
+                                    Text("Client (${user?['phone_number_malvoyant'] ?? 'N/A'})"),
+                                  ],
+                                ),
+                              ),
+                              PopupMenuItem(
+                                value: "famille",
+                                child: Row(
+                                  children: [
+                                    const Icon(Icons.family_restroom, size: 18, color: AppTheme.primary),
+                                    const SizedBox(width: 8),
+                                    Text("Famille (${user?['phone_number_famille'] ?? 'N/A'})"),
+                                  ],
+                                ),
+                              ),
+                            ],
+                            child: OutlinedButton.icon(
+                              onPressed: null, // the popup overrides this
+                              icon: const Icon(Icons.phone),
+                              label: const Text("Appeler"),
+                            ),
+                          ),
+                          
                           const SizedBox(width: 8),
                           ElevatedButton.icon(
                             onPressed: () => _resolveAlert(alert["alert_id"]),
                             icon: const Icon(Icons.check, size: 18),
-                            label: const Text("Résoudre"),
+                            label: const Text("Traiter"),
                             style: ElevatedButton.styleFrom(backgroundColor: AppTheme.normalGreen),
                           ),
                         ],

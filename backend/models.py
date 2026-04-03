@@ -44,6 +44,9 @@ class UserDocument(BaseModel):
     emergency_contacts: List[EmergencyContact] = []
     medical_info: Optional[MedicalInfo] = None
     status: str = "normal"  # normal / HELP / SOS
+    is_online: bool = True
+    latitude: float = 36.8065  # Default Tunis
+    longitude: float = 10.1815
 
 # --- Alert ---
 class Alert(BaseModel):
@@ -64,6 +67,7 @@ class StaffUser(BaseModel):
     email: EmailStr
     password: str  # In production: hashed
     role: str  # "admin" or "staff"
+    shift: str = "matin" # matin / soir
 
 # --- Auth ---
 class LoginRequest(BaseModel):

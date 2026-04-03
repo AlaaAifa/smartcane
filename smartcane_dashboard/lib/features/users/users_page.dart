@@ -3,7 +3,8 @@ import '../../core/theme.dart';
 import '../../core/api_service.dart';
 
 class UsersPage extends StatefulWidget {
-  const UsersPage({super.key});
+  final Function(String)? onNavigate;
+  const UsersPage({super.key, this.onNavigate});
 
   @override
   State<UsersPage> createState() => _UsersPageState();
@@ -41,9 +42,32 @@ class _UsersPageState extends State<UsersPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text("Utilisateurs", style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900)),
-          const SizedBox(height: 4),
-          Text("${users.length} utilisateurs enregistrés", style: TextStyle(color: Colors.grey.shade600)),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text("Utilisateurs", style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900)),
+                  const SizedBox(height: 4),
+                  Text("${users.length} utilisateurs enregistrés", style: TextStyle(color: Colors.grey.shade600)),
+                ],
+              ),
+              ElevatedButton.icon(
+                onPressed: () {
+                  if (widget.onNavigate != null) {
+                    widget.onNavigate!("/add-user");
+                  }
+                },
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                  backgroundColor: AppTheme.primary,
+                ),
+                icon: const Icon(Icons.person_add),
+                label: const Text("Ajouter Utilisateur"),
+              )
+            ],
+          ),
           const SizedBox(height: 24),
 
           // Table header
@@ -56,6 +80,7 @@ class _UsersPageState extends State<UsersPage> {
                 Expanded(flex: 2, child: Text("Email", style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13))),
                 Expanded(flex: 2, child: Text("Téléphone", style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13))),
                 Expanded(flex: 1, child: Text("Statut", style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13))),
+                SizedBox(width: 100), // Actions column width
               ],
             ),
           ),
@@ -95,23 +120,75 @@ class _UsersPageState extends State<UsersPage> {
                       Expanded(flex: 2, child: Text(u["phone_number_malvoyant"] ?? "", style: TextStyle(color: Colors.grey.shade600, fontSize: 13))),
                       Expanded(
                         flex: 1,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: _statusColor(status).withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(20),
+                        child: Align(
+                          alignment: Alignment.centerLeft,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: _statusColor(status).withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Text(status.toUpperCase(),
+                              textAlign: TextAlign.center,
+                              style: TextStyle(color: _statusColor(status), fontWeight: FontWeight.w700, fontSize: 12)),
                           ),
-                          child: Text(status.toUpperCase(),
-                            textAlign: TextAlign.center,
-                            style: TextStyle(color: _statusColor(status), fontWeight: FontWeight.w700, fontSize: 12)),
                         ),
                       ),
+                      SizedBox(
+                        width: 100,
+                        child: TextButton(
+                          onPressed: () => _showUserDetails(context, u),
+                          child: const Text("Voir détails", style: TextStyle(fontSize: 12)),
+                        ),
+                      )
                     ],
                   ),
                 );
               },
             ),
           ),
+        ],
+      ),
+    );
+  }
+
+  void _showUserDetails(BuildContext context, Map<String, dynamic> user) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text("Détails: ${user['prenom']} ${user['nom']}", style: const TextStyle(fontWeight: FontWeight.bold)),
+        content: SizedBox(
+          width: 400,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _detailRow(Icons.email, "Email", user["email"]),
+              _detailRow(Icons.phone, "Téléphone", user["phone_number_malvoyant"]),
+              _detailRow(Icons.family_restroom, "Téléphone Famille", user["phone_number_famille"]),
+              const Divider(height: 30),
+              _detailRow(Icons.settings_cell, "Cane ID (Code)", user["cane_details"]?["serial_number"] ?? "N/A"),
+              _detailRow(Icons.wifi, "Connecté", (user["is_online"] ?? false) ? "Oui" : "Non"),
+              _detailRow(Icons.warning, "Statut", user["status"]),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("Fermer"))
+        ],
+      ),
+    );
+  }
+
+  Widget _detailRow(IconData icon, String label, dynamic value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        children: [
+          Icon(icon, size: 20, color: Colors.grey.shade600),
+          const SizedBox(width: 12),
+          Text("$label : ", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey.shade700)),
+          Expanded(child: Text("${value ?? 'Non spécifié'}"))
         ],
       ),
     );
