@@ -10,8 +10,8 @@ import 'features/alerts/alerts_page.dart';
 import 'features/alerts/history_page.dart';
 import 'features/map/map_page.dart';
 import 'features/admin/solved_alerts_page.dart';
-import 'features/admin/add_staff_page.dart';
 import 'features/staff/staff_page.dart';
+import 'features/rentals/cane_rentals_page.dart';
 
 void main() {
   runApp(const SmartCaneDashboard());
@@ -90,7 +90,9 @@ class _AppNavigatorState extends State<AppNavigator> {
       case "/history":
         return const HistoryPage();
       case "/staff":
-        return const StaffPage();
+        return StaffPage();
+      case "/rentals":
+        return CaneRentalsPage();
       case "/map":
         return MapPage(
           latitude: _mapLat ?? 36.8065,
@@ -100,8 +102,7 @@ class _AppNavigatorState extends State<AppNavigator> {
         );
       case "/solved":
         return const SolvedAlertsPage();
-      case "/add-staff":
-        return const AddStaffPage();
+
       default:
         return DashboardPage(onNavigate: _navigate);
     }

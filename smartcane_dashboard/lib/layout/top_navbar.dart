@@ -73,51 +73,8 @@ class TopNavbar extends StatelessWidget {
                       _buildNavItem("Alertes Live", Icons.notification_important_rounded, "/alerts", isNarrow),
                       _buildNavItem("Historique", Icons.history_rounded, "/history", isNarrow),
                       _buildNavItem("Staff", Icons.badge_rounded, "/staff", isNarrow),
-                      
-                      // Admin Dropdown
-                      if (ApiService.isAdmin)
-                        Padding(
-                          padding: const EdgeInsets.only(left: 12),
-                          child: PopupMenuButton<String>(
-                            onSelected: (route) => onNavigate(route),
-                            offset: const Offset(0, 45),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                            color: AppTheme.sidebarActive,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                              decoration: BoxDecoration(
-                                color: (currentRoute == "/add-staff")
-                                    ? AppTheme.sidebarActive
-                                    : Colors.transparent,
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: Row(
-                                children: [
-                                  const Icon(Icons.admin_panel_settings_rounded, color: Colors.white70, size: 20),
-                                  if (!isNarrow) ...[
-                                    const SizedBox(width: 8),
-                                    const Text(
-                                      "Admin",
-                                      style: TextStyle(
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.w600,
-                                        fontSize: 14,
-                                      ),
-                                    ),
-                                    const Icon(Icons.arrow_drop_down, color: Colors.white70),
-                                  ],
-                                ],
-                              ),
-                            ),
-                            itemBuilder: (context) => [
-                              _buildDropdownItem(
-                                "Ajouter Staff",
-                                Icons.admin_panel_settings_rounded,
-                                "/add-staff",
-                              ),
-                            ],
-                          ),
-                        ),
+                      _buildNavItem("Gestion Location", Icons.shopping_cart_rounded, "/rentals", isNarrow),
+                      _buildNavItem("Enregistrement Ventes", Icons.person_add_alt_1_rounded, "/add-user", isNarrow),
                     ],
                   ),
                 ),

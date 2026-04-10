@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #333; line-height: 1.6; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e1e1e1; border-radius: 12px; }
+        .header { text-align: center; color: #1a237e; margin-bottom: 30px; }
+        .otp { font-size: 32px; font-weight: bold; background: #f5f5f5; padding: 15px; border-radius: 8px; text-align: center; letter-spacing: 5px; color: #1a237e; border: 2px dashed #1a237e; }
+        .footer { margin-top: 40px; font-size: 12px; color: #888; text-align: center; border-top: 1px solid #eee; padding-top: 20px; }
+        .warning { color: #d32f2f; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Smart Cane</h1>
+            <p>Réinitialisation du mot de passe</p>
+        </div>
+        
+        <p>Bonjour,</p>
+        <p>Vous avez demandé la réinitialisation de votre mot de passe Dashboard Smart Cane. Voici votre code de vérification :</p>
+        
+        <div class="otp">{{ otp_code }}</div>
+        
+        <p>Ce code est valide pendant **10 minutes**. Si vous n'avez pas demandé cette réinitialisation, veuillez ignorer cet e-mail.</p>
+        
+        <p class="warning">Pour votre sécurité, ne partagez jamais ce code avec personne.</p>
+        
+        <div class="footer">
+            <p>&copy; 2026 Smart Cane Project. Tous droits réservés.</p>
+            <p>Système de gestion de cannes intelligentes.</p>
+        </div>
+    </div>
+</body>
+</html>

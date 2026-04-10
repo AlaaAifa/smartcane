@@ -58,7 +58,13 @@ class Alert(BaseModel):
     timestamp: str
     status: str = "active"  # active / resolved
     resolved_by: Optional[str] = None
+    resolved_by_name: Optional[str] = None
     resolved_at: Optional[str] = None
+    taken_by: Optional[str] = None  # staff_id
+    taken_by_name: Optional[str] = None # staff_name for easy UI display
+    reactivated_by: Optional[str] = None
+    reactivated_by_name: Optional[str] = None
+    reactivated_at: Optional[str] = None
 
 # --- Staff / Admin ---
 class StaffUser(BaseModel):
@@ -68,6 +74,8 @@ class StaffUser(BaseModel):
     password: str  # In production: hashed
     role: str  # "admin" or "staff"
     shift: str = "matin" # matin / soir
+    phone: Optional[str] = None
+    address: Optional[str] = None
 
 # --- Auth ---
 class LoginRequest(BaseModel):
@@ -79,3 +87,15 @@ class TokenResponse(BaseModel):
     role: str
     name: str
     staff_id: str
+
+# --- Reset Password ---
+class ResetRequest(BaseModel):
+    email: EmailStr
+
+class VerifyOTPRequest(BaseModel):
+    email: EmailStr
+    code: str
+
+class ResetPassword(BaseModel):
+    email: EmailStr
+    new_password: str
