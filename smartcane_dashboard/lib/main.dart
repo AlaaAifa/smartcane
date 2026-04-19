@@ -1,17 +1,17 @@
 import 'package:flutter/material.dart';
-import 'core/theme.dart';
-import 'core/api_service.dart';
-import 'layout/top_navbar.dart';
-import 'features/auth/login_page.dart';
-import 'features/dashboard/dashboard_page.dart';
-import 'features/users/users_page.dart';
-import 'features/users/add_user_page.dart';
-import 'features/alerts/alerts_page.dart';
-import 'features/alerts/history_page.dart';
-import 'features/map/map_page.dart';
-import 'features/admin/solved_alerts_page.dart';
-import 'features/staff/staff_page.dart';
-import 'features/rentals/cane_rentals_page.dart';
+import 'views/theme.dart';
+import 'services/services.dart';
+import 'views/layout/top_navbar.dart';
+import 'views/auth/login_page.dart';
+import 'views/dashboard/dashboard_page.dart';
+import 'views/users/users_page.dart';
+import 'views/users/add_user_page.dart';
+import 'views/alerts/alerts_page.dart';
+import 'views/alerts/history_page.dart';
+import 'views/map/map_page.dart';
+import 'views/admin/solved_alerts_page.dart';
+import 'views/staff/staff_page.dart';
+import 'views/rentals/cane_rentals_page.dart';
 
 void main() {
   runApp(const SmartCaneDashboard());
@@ -68,7 +68,7 @@ class _AppNavigatorState extends State<AppNavigator> {
 
     // If logging out, clear token
     if (route == "/login") {
-      ApiService.logout();
+      BaseService.logout();
       _history.clear();
     } else {
       _history.add(_currentRoute);

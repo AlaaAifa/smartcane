@@ -1,0 +1,21 @@
+class BaseService {
+  static const String baseUrl = "http://127.0.0.1:8000";
+  static String? token;
+  static String? role;
+  static String? staffName;
+  static String? staffId;
+
+  static Map<String, String> get headers => {
+    "Content-Type": "application/json",
+    if (token != null) "Authorization": "Bearer $token",
+  };
+
+  static bool get isAdmin => role == "admin";
+
+  static void logout() {
+    token = null;
+    role = null;
+    staffName = null;
+    staffId = null;
+  }
+}

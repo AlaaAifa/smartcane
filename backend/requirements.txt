@@ -7,3 +7,6 @@ requests
 # SMTP Integration
 fastapi-mail
 python-dotenv
+# Database - MySQL
+PyMySQL
+cryptography
