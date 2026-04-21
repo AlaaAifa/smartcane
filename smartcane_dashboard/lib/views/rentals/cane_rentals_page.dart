@@ -18,8 +18,12 @@ class _CaneRentalsPageState extends State<CaneRentalsPage> {
   int? _calculatedAge;
   
   final _cinController = TextEditingController();
+  final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
-  final _addressController = TextEditingController();
+  final _streetController = TextEditingController(); // Replaced _addressController
+  final _cityController = TextEditingController();
+  final _postalCodeController = TextEditingController();
+  final _countryController = TextEditingController();
   final _healthNotesController = TextEditingController();
 
   // Emergency Contact
@@ -29,6 +33,9 @@ class _CaneRentalsPageState extends State<CaneRentalsPage> {
 
   // Rental Contract
   final _startDateController = TextEditingController();
+  final _endDateController = TextEditingController();
+  DateTime _rentalStartDate = DateTime.now();
+  DateTime _rentalEndDate = DateTime.now().add(const Duration(days: 30));
   final _internalNotesController = TextEditingController();
 
   bool _formationNecessaire = false;
@@ -50,54 +57,60 @@ class _CaneRentalsPageState extends State<CaneRentalsPage> {
 
   int get _monthlyRate => _monthlyPrices[_selectedVersion] ?? 0;
 
-  int _rentalMonths = 1;
-  int get _totalRentalPrice => _rentalMonths * _monthlyRate;
+  int get _rentalDurationMonths {
+    return _calculateMonths(_rentalStartDate, _rentalEndDate);
+  }
+
+  int get _totalRentalPrice => _rentalDurationMonths * _monthlyRate;
+
+  int _calculateMonths(DateTime start, DateTime end) {
+    if (end.isBefore(start)) return 0;
+    int months = (end.year - start.year) * 12 + end.month - start.month;
+    if (end.day > start.day) months++;
+    return months == 0 && end.isAfter(start) ? 1 : months;
+  }
 
   // Payment
   bool _isPaymentConfirmed = false;
   String _paymentMethod = "Espèces";
 
-  String get _calculatedEndDate {
-    final start = _parseDate(_startDateController.text);
-    if (start == null) return "--";
-    // Add exact months to start date
-    final end = DateTime(start.year, start.month + _rentalMonths, start.day);
-    return "${end.day.toString().padLeft(2, '0')}/${end.month.toString().padLeft(2, '0')}/${end.year}";
-  }
-
-  DateTime? _parseDate(String text) {
-    try {
-      final parts = text.split('/');
-      if (parts.length == 3) {
-        return DateTime(int.parse(parts[2]), int.parse(parts[1]), int.parse(parts[0]));
-      }
-    } catch (_) {}
-    return null;
-  }
+  // Removed _calculatedEndDate and _parseDate helpers as we now use DateTime objects directly
 
   @override
   void dispose() {
     _fullNameController.dispose();
     _birthDateController.dispose();
     _cinController.dispose();
+    _emailController.dispose();
     _phoneController.dispose();
-    _addressController.dispose();
+    _streetController.dispose();
+    _cityController.dispose();
+    _postalCodeController.dispose();
+    _countryController.dispose();
     _healthNotesController.dispose();
     _emergencyNameController.dispose();
     _emergencyPhoneController.dispose();
     _emergencyRelationController.dispose();
     _startDateController.dispose();
+    _endDateController.dispose();
     _internalNotesController.dispose();
     _simNumberController.dispose();
     super.dispose();
   }
 
-  Future<void> _selectDate(BuildContext context, TextEditingController controller) async {
+  @override
+  void initState() {
+    super.initState();
+    _startDateController.text = "${_rentalStartDate.day}/${_rentalStartDate.month}/${_rentalStartDate.year}";
+    _endDateController.text = "${_rentalEndDate.day}/${_rentalEndDate.month}/${_rentalEndDate.year}";
+  }
+
+  Future<void> _selectRentalPeriodDate(BuildContext context, bool isStartDate) async {
     final DateTime? picked = await showDatePicker(
       context: context,
-      initialDate: DateTime.now(),
-      firstDate: DateTime(2000),
-      lastDate: DateTime(2101),
+      initialDate: isStartDate ? _rentalStartDate : _rentalEndDate,
+      firstDate: isStartDate ? DateTime.now().subtract(const Duration(days: 30)) : _rentalStartDate,
+      lastDate: DateTime.now().add(const Duration(days: 3650)),
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
@@ -111,9 +124,20 @@ class _CaneRentalsPageState extends State<CaneRentalsPage> {
         );
       },
     );
+
     if (picked != null) {
       setState(() {
-        controller.text = "${picked.day}/${picked.month}/${picked.year}";
+        if (isStartDate) {
+          _rentalStartDate = picked;
+          _startDateController.text = "${picked.day}/${picked.month}/${picked.year}";
+          if (_rentalEndDate.isBefore(_rentalStartDate)) {
+            _rentalEndDate = _rentalStartDate.add(const Duration(days: 30));
+            _endDateController.text = "${_rentalEndDate.day}/${_rentalEndDate.month}/${_rentalEndDate.year}";
+          }
+        } else {
+          _rentalEndDate = picked;
+          _endDateController.text = "${picked.day}/${picked.month}/${picked.year}";
+        }
       });
     }
   }
@@ -195,21 +219,29 @@ class _CaneRentalsPageState extends State<CaneRentalsPage> {
 
   @override
   Widget build(BuildContext context) {
+    bool isWizard = _currentStep >= 2;
+    
     return Scaffold(
       backgroundColor: Colors.transparent,
-      body: SingleChildScrollView(
-        physics: const BouncingScrollPhysics(),
-        child: Padding(
-          padding: const EdgeInsets.all(40),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildHeader(),
-              const SizedBox(height: 40),
-              _buildStepper(),
-              const SizedBox(height: 40),
-              _buildCurrentStepContent(),
-            ],
+      body: Form(
+        key: _formKey,
+        child: SingleChildScrollView(
+          physics: const BouncingScrollPhysics(),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 40),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildHeader(),
+                if (isWizard) ...[
+                  const SizedBox(height: 40),
+                  _buildStepper(),
+                ],
+                const SizedBox(height: 40),
+                _buildCurrentStepContent(),
+              ],
+              mainAxisSize: MainAxisSize.min,
+            ),
           ),
         ),
       ),
@@ -228,6 +260,8 @@ class _CaneRentalsPageState extends State<CaneRentalsPage> {
               style: IconButton.styleFrom(
                 backgroundColor: Colors.white,
                 padding: const EdgeInsets.all(12),
+                shadowColor: Colors.black12,
+                elevation: 4,
               ),
             ),
           ),
@@ -240,7 +274,7 @@ class _CaneRentalsPageState extends State<CaneRentalsPage> {
               style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: Colors.black87),
             ),
             Text(
-              "Enregistrement des nouveaux contrats de location",
+               _getStepSubtitle(),
               style: TextStyle(color: Colors.grey.withOpacity(0.8), fontSize: 14),
             ),
           ],
@@ -249,14 +283,35 @@ class _CaneRentalsPageState extends State<CaneRentalsPage> {
     );
   }
 
+  String _getStepSubtitle() {
+    if (_currentStep == 0) return "Sélectionnez votre modèle de canne";
+    if (_currentStep == 1) return "Détails de la configuration sélectionnée";
+    
+    switch (_currentStep) {
+      case 2: return "Étape 1 : Coordonnées du bénéficiaire";
+      case 3: return "Étape 2 : Adresse de résidence";
+      case 4: return "Étape 3 : Contact d'urgence";
+      case 5: return "Étape 4 : Équipement et Période de location";
+      case 6: return "Étape 5 : Règlement et Paiement";
+      case 7: return "Étape 6 : Récapitulatif et Signature du contrat";
+      default: return "";
+    }
+  }
+
   Widget _buildStepper() {
     return Row(
       children: [
-        _buildStepIndicator(0, "Modèle", Icons.devices_other),
-        _buildStepLine(0),
-        _buildStepIndicator(1, "Détails", Icons.info_outline),
-        _buildStepLine(1),
-        _buildStepIndicator(2, "Contrat", Icons.description_outlined),
+        _buildStepIndicator(2, "Client", Icons.person_outline),
+        _buildStepLine(2),
+        _buildStepIndicator(3, "Adresse", Icons.location_on_outlined),
+        _buildStepLine(3),
+        _buildStepIndicator(4, "Urgence", Icons.emergency_outlined),
+        _buildStepLine(4),
+        _buildStepIndicator(5, "Période", Icons.calendar_month),
+        _buildStepLine(5),
+        _buildStepIndicator(6, "Paiement", Icons.payments_outlined),
+        _buildStepLine(6),
+        _buildStepIndicator(7, "Contrat", Icons.description_outlined),
       ],
     );
   }
@@ -301,56 +356,148 @@ class _CaneRentalsPageState extends State<CaneRentalsPage> {
 
   Widget _buildCurrentStepContent() {
     switch (_currentStep) {
-      case 0: return _buildVersionGrid();
-      case 1: return _buildDetailedProductSheet();
-      case 2: return _buildFormSection();
+      case 0: return _buildSelectionStep();
+      case 1: return _buildDetailsStep();
+      case 2: return _buildStepClientInfo();
+      case 3: return _buildStepAddress();
+      case 4: return _buildStepEmergencyContact();
+      case 5: return _buildStepCaneEquipment();
+      case 6: return _buildStepPayment();
+      case 7: return _buildStepContractDetails();
       default: return const SizedBox();
     }
   }
 
-  Widget _buildVersionGrid() {
-    return GridView.count(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      crossAxisCount: 3,
-      childAspectRatio: 0.58, 
-      crossAxisSpacing: 32,
+  Widget _buildSelectionStep() {
+    final screenWidth = MediaQuery.of(context).size.width;
+    bool isMobile = screenWidth < 1200;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _CaneVersionCard(
-          title: "Smart Lite",
-          subtitle: "L'essentiel pour une mobilité urbaine simple et sécurisée.",
-          badge: "ESSENTIEL",
-          badgeColor: Colors.blue.shade600,
-          features: ["Détection d'obstacles", "Alertes vibrations", "Ultra légère"],
-          isSelected: _selectedVersion == "Smart Lite",
-          isFullOverlay: true, 
-          onTap: () => setState(() { _selectedVersion = "Smart Lite"; _currentStep = 1; }),
+        const Text(
+          "Quelle version de la Smart Cane souhaitez-vous louer ?",
+          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.black54),
         ),
-        _CaneVersionCard(
-          title: "Smart Pro V2",
-          subtitle: "Technologie avancée avec retour haptique et connexion mobile.",
-          badge: "AVANCÉ",
-          badgeColor: Colors.indigo.shade600,
-          features: ["Radar longue portée", "Alertes temps réel", "GPS Assisté"],
-          isSelected: _selectedVersion == "Smart Pro V2",
-          isFullOverlay: true,
-          onTap: () => setState(() { _selectedVersion = "Smart Pro V2"; _currentStep = 1; }),
+        const SizedBox(height: 32),
+        if (isMobile)
+          Column(
+            children: [
+              SizedBox(height: 500, child: _buildVersionCard("Smart Lite", "Légèreté & Simplicité", "ESSENTIEL", Colors.blue, ["48h autonomie", "Ultra légère (200g)", "Détection 1.5m"])),
+              const SizedBox(height: 24),
+              SizedBox(height: 500, child: _buildVersionCard("Smart Pro V2", "Précision & Bluetooth", "POPULAIRE", Colors.indigo, ["Radar Ultrasons (3m)", "Vibrations haptiques", "Bluetooth App"])),
+              const SizedBox(height: 24),
+              SizedBox(height: 500, child: _buildVersionCard("Smart Pro V3", "IA & LiDAR Vision", "ÉLITE", Colors.deepPurple, ["IA Vision & LiDAR", "Connexion 5G", "Assistance vocale"])),
+            ],
+          )
+        else
+          SizedBox(
+            height: 550,
+            child: Row(
+              children: [
+                Expanded(child: _buildVersionCard("Smart Lite", "Légèreté & Simplicité", "ESSENTIEL", Colors.blue, ["48h autonomie", "Ultra légère (200g)", "Détection 1.5m"])),
+                const SizedBox(width: 24),
+                Expanded(child: _buildVersionCard("Smart Pro V2", "Précision & Bluetooth", "POPULAIRE", Colors.indigo, ["Radar Ultrasons (3m)", "Vibrations haptiques", "Bluetooth App"])),
+                const SizedBox(width: 24),
+                Expanded(child: _buildVersionCard("Smart Pro V3", "IA & LiDAR Vision", "ÉLITE", Colors.deepPurple, ["IA Vision & LiDAR", "Connexion 5G", "Assistance vocale"])),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildDetailsStep() {
+    final screenWidth = MediaQuery.of(context).size.width;
+    bool isWide = screenWidth > 1000;
+
+    return Container(
+      padding: const EdgeInsets.all(40),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 30, offset: const Offset(0, 15))],
+      ),
+      child: isWide 
+        ? Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(flex: 2, child: _buildDetailsImage()),
+              const SizedBox(width: 60),
+              Expanded(flex: 3, child: _buildDetailsInfo()),
+            ],
+          )
+        : Column(
+            children: [
+              _buildDetailsImage(),
+              const SizedBox(height: 40),
+              _buildDetailsInfo(),
+            ],
+          ),
+    );
+  }
+
+  Widget _buildDetailsImage() {
+    return Hero(
+      tag: 'cane_image_$_selectedVersion',
+      child: Center(
+        child: Image.asset(
+          _selectedVersion == "Smart Lite" ? "assets/images/smart_lite.png" : 
+          (_selectedVersion == "Smart Pro V2" ? "assets/images/smart_pro_v2.png" : "assets/images/smart_pro_v3.png"),
+          height: 350,
+          fit: BoxFit.contain,
         ),
-        _CaneVersionCard(
-          title: "Smart Pro V3",
-          subtitle: "L'excellence technologique avec IA et vision augmentée.",
-          badge: "PREMIUM",
-          badgeColor: const Color(0xFF6200EA),
-          features: ["Caméra IA & LiDAR", "Navigation 5G", "Assistance totale"],
-          isSelected: _selectedVersion == "Smart Pro V3",
-          isFullOverlay: true,
-          onTap: () => setState(() { _selectedVersion = "Smart Pro V3"; _currentStep = 1; }),
+      ),
+    );
+  }
+
+  Widget _buildDetailsInfo() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildSectionHeader(Icons.info_outline, "DÉTAILS DU PRODUIT"),
+        const SizedBox(height: 24),
+        Text(_selectedVersion, style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w900)),
+        const SizedBox(height: 4),
+        Text(_getPriceForVersion(), style: const TextStyle(fontSize: 20, color: AppTheme.primary, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 24),
+        Text(
+          _getDescriptionForVersion(),
+          style: TextStyle(fontSize: 16, color: Colors.grey.shade700, height: 1.6),
+        ),
+        const SizedBox(height: 32),
+        const Text("Caractéristiques incluses :", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+        const SizedBox(height: 16),
+        ..._getFeaturesForVersion().map((f) => Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: Row(
+            children: [
+              const Icon(Icons.check_circle, color: AppTheme.normalGreen, size: 20),
+              const SizedBox(width: 12),
+              Text(f, style: const TextStyle(fontSize: 16)),
+            ],
+          ),
+        )),
+        const SizedBox(height: 40),
+        SizedBox(
+          width: double.infinity,
+          height: 60,
+          child: ElevatedButton(
+            onPressed: () => setState(() => _currentStep = 2),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primary,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              elevation: 4,
+            ),
+            child: const Text("PROCÉDER À LA LOCATION", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, letterSpacing: 0.5)),
+          ),
         ),
       ],
     );
   }
 
-  Widget _buildDetailedProductSheet() {
+  Widget _buildStepContainer({required String title, required IconData icon, required List<Widget> children}) {
     return Container(
       padding: const EdgeInsets.all(40),
       decoration: BoxDecoration(
@@ -360,124 +507,343 @@ class _CaneRentalsPageState extends State<CaneRentalsPage> {
           BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 30, offset: const Offset(0, 15))
         ],
       ),
-      child: Row(
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            flex: 2,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: AppTheme.primary.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: const Text(
-                        "DISPONIBLE",
-                        style: TextStyle(color: AppTheme.primary, fontWeight: FontWeight.bold, fontSize: 11),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    const Text("Réf : SN-2024-X4", style: TextStyle(color: Colors.grey, fontSize: 12)),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  _selectedVersion,
-                  style: const TextStyle(fontSize: 40, fontWeight: FontWeight.w900, color: Colors.black87),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  _getDescriptionForVersion(),
-                  style: TextStyle(fontSize: 16, color: Colors.grey.shade600, height: 1.6),
-                ),
-                const SizedBox(height: 32),
-                const Text("ÉQUIPEMENTS & FONCTIONS", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, letterSpacing: 1.1)),
-                const SizedBox(height: 16),
-                Wrap(
-                  spacing: 12,
-                  runSpacing: 12,
-                  children: _getFeaturesForVersion().map((f) => Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade50,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.black12),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.auto_awesome, color: Colors.amber, size: 16),
-                        const SizedBox(width: 8),
-                        Text(f, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                      ],
-                    ),
-                  )).toList(),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 60),
-          Expanded(
-            flex: 1,
-            child: Container(
-              padding: const EdgeInsets.all(32),
-              decoration: BoxDecoration(
-                color: Colors.grey.shade50,
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(color: Colors.black.withOpacity(0.05)),
-              ),
-              child: Column(
-                children: [
-                  const Text("TARIF LOCATION", style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold, fontSize: 11)),
-                  const SizedBox(height: 12),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Text(
-                        _monthlyRate.toString(),
-                        style: const TextStyle(fontSize: 48, fontWeight: FontWeight.w900, color: AppTheme.primary),
-                      ),
-                      const Padding(
-                        padding: EdgeInsets.only(bottom: 8, left: 4),
-                        child: Text("TND/Mois", style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.primary)),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 32),
-                  const Divider(),
-                  const SizedBox(height: 32),
-                  _buildBulletInfo(Icons.check_circle_outline, "Maintenance incluse"),
-                  const SizedBox(height: 12),
-                  _buildBulletInfo(Icons.check_circle_outline, "Remplacement en 24h"),
-                  const SizedBox(height: 12),
-                  _buildBulletInfo(Icons.check_circle_outline, "Assistance téléphonique"),
-                  const SizedBox(height: 48),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 56,
-                    child: ElevatedButton(
-                      onPressed: () => setState(() => _currentStep = 2),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppTheme.primary,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                      ),
-                      child: const Text("CONTINUER LA LOCATION", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
-                    ),
-                  )
-                ],
-              ),
-            ),
-          ),
+          _buildSectionHeader(icon, title),
+          const SizedBox(height: 32),
+          ...children,
+          const SizedBox(height: 40),
+          _buildNavigationButtons(),
         ],
       ),
     );
   }
+
+  Widget _buildNavigationButtons() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        OutlinedButton.icon(
+          onPressed: () => setState(() => _currentStep--),
+          icon: const Icon(Icons.arrow_back),
+          label: const Text("PRÉCÉDENT"),
+          style: OutlinedButton.styleFrom(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+        ),
+        ElevatedButton.icon(
+          onPressed: _isSubmitting ? null : () {
+            if (_formKey.currentState!.validate()) {
+              if (_currentStep < 6) {
+                setState(() => _currentStep++);
+              } else if (_currentStep == 6) {
+                if (_isPaymentConfirmed) {
+                  setState(() => _currentStep++);
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                    content: Text("Veuillez confirmer le paiement pour passer au récapitulatif."),
+                    backgroundColor: AppTheme.sosRed,
+                  ));
+                }
+              } else {
+                _submitRegistration();
+              }
+            }
+          },
+          icon: _isSubmitting 
+            ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+            : Icon(_currentStep == 7 ? Icons.check_circle : Icons.arrow_forward),
+          label: Text(_currentStep == 7 ? (_isSubmitting ? "ENREGISTREMENT..." : "ENREGISTRER LA LOCATION") : "SUIVANT"),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppTheme.primary,
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStepClientInfo() {
+    return _buildStepContainer(
+      title: "I. COORDONNÉES DU BÉNÉFICIAIRE",
+      icon: Icons.person_outline,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              flex: 2,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildFieldLabel("CIN"),
+                  _buildTextField(_cinController, "Numéro carte identité", Icons.badge_outlined, isNumber: true),
+                ],
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              flex: 3,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildFieldLabel("Nom et prénom complet"),
+                  _buildTextField(_fullNameController, "Ex: Jean Dupont", Icons.person_outline),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 24),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Expanded(
+              flex: 3,
+              child: GestureDetector(
+                onTap: () => _selectBirthDate(context),
+                child: AbsorbPointer(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildFieldLabel("Date de naissance"),
+                      _buildTextField(_birthDateController, "Sélectionner...", Icons.calendar_today_outlined),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              flex: 1,
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                decoration: BoxDecoration(
+                  color: AppTheme.primary.withOpacity(0.05),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppTheme.primary.withOpacity(0.1)),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text("ÂGE", style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.grey)),
+                    Text(
+                      _calculatedAge != null ? "$_calculatedAge" : "--",
+                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: AppTheme.primary),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 24),
+        _buildFieldLabel("Adresse Email"),
+        _buildTextField(
+          _emailController, 
+          "exemple@mail.com", 
+          Icons.email_outlined,
+          validator: (value) {
+            if (value == null || value.isEmpty) return "L'email est requis";
+            if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
+              return "Veuillez entrer un email valide";
+            }
+            return null;
+          }
+        ),
+        const SizedBox(height: 24),
+        _buildFieldLabel("Téléphone principal"),
+        _buildTextField(_phoneController, "01 23 45 67 89", Icons.phone_outlined, isNumber: true),
+      ],
+    );
+  }
+
+  Widget _buildStepAddress() {
+    return _buildStepContainer(
+      title: "II. ADRESSE",
+      icon: Icons.location_on_outlined,
+      children: [
+        _buildFieldLabel("Pays"),
+        _buildTextField(_countryController, "Ex: Tunisie", Icons.public_outlined),
+        const SizedBox(height: 24),
+        Row(
+          children: [
+            Expanded(
+              flex: 2,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildFieldLabel("Ville"),
+                  _buildTextField(_cityController, "Ex: Tunis", Icons.location_city_outlined),
+                ],
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              flex: 1,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                   _buildFieldLabel("Code Postal"),
+                  _buildTextField(_postalCodeController, "1002", Icons.map_outlined, isNumber: true),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStepEmergencyContact() {
+    return _buildStepContainer(
+      title: "III. CONTACT D'URGENCE",
+      icon: Icons.emergency_outlined,
+      children: [
+        _buildFieldLabel("Nom du contact d'urgence"),
+        _buildTextField(_emergencyNameController, "Prénom et Nom du proche", Icons.person_search_outlined),
+        const SizedBox(height: 24),
+        Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildFieldLabel("Relation / Lien"),
+                  _buildTextField(_emergencyRelationController, "Ex: Fils, Épouse...", Icons.family_restroom_outlined),
+                ],
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildFieldLabel("Numéro de téléphone"),
+                  _buildTextField(_emergencyPhoneController, "Numéro permanent", Icons.phone_enabled_outlined, isNumber: true),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStepCaneEquipment() {
+    final versionController = TextEditingController(text: _selectedVersion);
+    
+    return _buildStepContainer(
+      title: "IV. ÉQUIPEMENT ET PÉRIODE",
+      icon: Icons.sensors_outlined,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              flex: 2,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildFieldLabel("Modèle de canne"),
+                  _buildTextField(versionController, "", Icons.inventory_2_outlined, readOnly: true, enabled: false),
+                ],
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              flex: 3,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildFieldLabel("Numéro SIM (4G) louée"),
+                  _buildTextField(_simNumberController, "Ex: 216XXXXXXXX", Icons.sim_card_outlined),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 24),
+        Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildFieldLabel("Date de début de location"),
+                  GestureDetector(
+                    onTap: () => _selectRentalPeriodDate(context, true),
+                    child: AbsorbPointer(
+                      child: _buildTextField(_startDateController, "Choisir...", Icons.calendar_today_outlined),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildFieldLabel("Date de fin de location"),
+                  GestureDetector(
+                    onTap: () => _selectRentalPeriodDate(context, false),
+                    child: AbsorbPointer(
+                      child: _buildTextField(_endDateController, "Choisir...", Icons.calendar_today_outlined),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 24),
+        _buildFieldLabel("Notes de santé / Pathologies (Bénéficiaire)"),
+        _buildTextField(_healthNotesController, "Ex: Diabète, Difficultés motrices...", Icons.health_and_safety_outlined, isMultiline: true, validator: (v) => null),
+      ],
+    );
+  }
+
+  Widget _buildVersionSelection() {
+    return Column(
+      children: [
+        SizedBox(
+          height: 180,
+          child: _buildVersionCard("Smart Lite", "Le plus léger", "NOUVEAUTÉ", Colors.blue, ["48h autonomie", "Léger 200g"]),
+        ),
+        const SizedBox(height: 16),
+        SizedBox(
+          height: 180,
+          child: _buildVersionCard("Smart Pro V2", "Équilibre parfait", "POPULAIRE", Colors.indigo, ["Radar 3m", "Haptique"]),
+        ),
+        const SizedBox(height: 16),
+        SizedBox(
+          height: 180,
+          child: _buildVersionCard("Smart Pro V3", "L'excellence IA", "PRÉDICTION", Colors.deepPurple, ["LiDAR & Caméra", "5G Ready"]),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildVersionCard(String title, String subtitle, String badge, Color color, List<String> features) {
+    return _CaneVersionCard(
+      title: title,
+      subtitle: subtitle,
+      badge: badge,
+      badgeColor: color,
+      features: features,
+      isSelected: _selectedVersion == title,
+      onTap: () {
+        setState(() {
+          _selectedVersion = title;
+          if (_currentStep == 0) _currentStep = 1;
+        });
+      },
+    );
+  }
+
 
   Widget _buildBulletInfo(IconData icon, String text) {
     return Row(
@@ -489,492 +855,171 @@ class _CaneRentalsPageState extends State<CaneRentalsPage> {
     );
   }
 
-  Widget _buildFormSection() {
-    return Container(
-      padding: const EdgeInsets.all(40),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 30,
-            offset: const Offset(0, 15),
-          )
-        ],
-      ),
-      child: Form(
-        key: _formKey,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+  Widget _buildStepContractDetails() {
+    return _buildStepContainer(
+      title: "VI. RÉCAPITULATIF DU CONTRAT",
+      icon: Icons.description_outlined,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: AppTheme.primary.withOpacity(0.05),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: AppTheme.primary.withOpacity(0.1)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text("Détails de la Période", style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.primary)),
+              const Divider(),
+              _infoRow("Date de début", _startDateController.text),
+              _infoRow("Date de fin", _endDateController.text),
+              _infoRow("Durée totale", "$_rentalDurationMonths mois"),
+              const SizedBox(height: 20),
+              const Text("Détails Financiers", style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.primary)),
+              const Divider(),
+              _infoRow("Modèle", _selectedVersion),
+              _infoRow("Tarif mensuel", "$_monthlyRate TND"),
+              const SizedBox(height: 12),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  _buildSectionHeader(Icons.assignment_ind_outlined, "INFORMATIONS DU CONTRAT"),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: AppTheme.primary.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      "Modèle : $_selectedVersion",
-                      style: const TextStyle(color: AppTheme.primary, fontWeight: FontWeight.bold),
-                    ),
-                  ),
+                  const Text("TOTAL DU CONTRAT", style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
+                  Text("$_totalRentalPrice TND", style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: AppTheme.primary)),
                 ],
               ),
-              const SizedBox(height: 32),
-              
-              _buildSectionHeader(Icons.person_outline, "I. COORDONNÉES DU BÉNÉFICIAIRE"),
-              const SizedBox(height: 24),
-              
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Expanded(
-                    flex: 2,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _buildFieldLabel("Nom et prénom complet"),
-                        _buildTextField(_fullNameController, "Ex: Jean Dupont", Icons.person_outline),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    flex: 1,
-                    child: Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: AppTheme.primary.withOpacity(0.05),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: AppTheme.primary.withOpacity(0.1)),
-                      ),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Text("ÂGE CALCULÉ", style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.grey)),
-                          Text(
-                            _calculatedAge != null ? "$_calculatedAge ans" : "--",
-                            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: AppTheme.primary),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 20),
-
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Expanded(
-                    flex: 3,
-                    child: GestureDetector(
-                      onTap: () => _selectBirthDate(context),
-                      child: AbsorbPointer(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _buildFieldLabel("Date de naissance"),
-                            _buildTextField(_birthDateController, "Sélectionner...", Icons.calendar_today_outlined),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 24),
-              
-              Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _buildFieldLabel("CIN"),
-                        _buildTextField(_cinController, "Numéro carte identité", Icons.badge_outlined, isNumber: true),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _buildFieldLabel("Téléphone principal"),
-                        _buildTextField(_phoneController, "01 23 45 67 89", Icons.phone_outlined, isNumber: true),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 20),
-              
-              _buildFieldLabel("Adresse de résidence"),
-              _buildTextField(_addressController, "Rue, Ville, Code Postal", Icons.location_on_outlined),
-              const SizedBox(height: 20),
-
-              _buildFieldLabel("Notes de santé / Pathologies"),
-              _buildTextField(_healthNotesController, "Ex: Diabète, Difficultés motrices...", Icons.health_and_safety_outlined, isMultiline: true),
-
-              const SizedBox(height: 32),
-              const Divider(height: 1, color: Colors.black12),
-              const SizedBox(height: 32),
-
-              _buildSectionHeader(Icons.emergency_outlined, "III. CONTACT D'URGENCE"),
-              const SizedBox(height: 24),
-
-              _buildFieldLabel("Nom du contact d'urgence"),
-              _buildTextField(_emergencyNameController, "Prénom et Nom du proche", Icons.person_search_outlined),
-              const SizedBox(height: 20),
-
-              Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _buildFieldLabel("Relation / Lien"),
-                        _buildTextField(_emergencyRelationController, "Ex: Fils, Épouse...", Icons.family_restroom_outlined),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _buildFieldLabel("Numéro de téléphone"),
-                        _buildTextField(_emergencyPhoneController, "Numéro permanent", Icons.phone_enabled_outlined, isNumber: true),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: 32),
-              const Divider(height: 1, color: Colors.black12),
-              const SizedBox(height: 32),
-
-              _buildSectionHeader(Icons.calendar_month_outlined, "IV. DÉTAILS DU CONTRAT"),
-              const SizedBox(height: 24),
-
-              Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _buildFieldLabel("Date de début"),
-                        GestureDetector(
-                          onTap: () => _selectDate(context, _startDateController),
-                          child: AbsorbPointer(
-                            child: _buildTextField(_startDateController, "Choisir...", Icons.calendar_today_outlined),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    flex: 2,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _buildFieldLabel("Durée de location"),
-                        Row(
-                          children: [
-                            Expanded(child: _buildDurationButton(1, "1 Mois")),
-                            const SizedBox(width: 8),
-                            Expanded(child: _buildDurationButton(3, "3 Mois")),
-                            const SizedBox(width: 8),
-                            Expanded(child: _buildDurationButton(6, "6 Mois")),
-                            const SizedBox(width: 8),
-                            Expanded(child: _buildDurationButton(12, "1 An")),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: AppTheme.primary.withOpacity(0.05),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: AppTheme.primary.withOpacity(0.1)),
-                      ),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Text("DATE DE FIN PRÉVUE", style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.grey)),
-                          Text(
-                            _calculatedEndDate,
-                            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: AppTheme.primary),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: 20),
-              
-              // SIM Number field
-              _buildFieldLabel("Numéro SIM (4G) — Identifiant de la Canne"),
-              _buildTextField(_simNumberController, "Ex: 216XXXXXXXX", Icons.sim_card_outlined),
-              
-              const SizedBox(height: 20),
-
-              // Price breakdown card
-              if (_rentalMonths > 0)
-                Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: AppTheme.primary.withOpacity(0.03),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: AppTheme.primary.withOpacity(0.15)),
-                  ),
-                  child: Column(
-                    children: [
-                      Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                        const Text("Tarif mensuel", style: TextStyle(color: Colors.grey, fontSize: 13)),
-                        Text("$_monthlyRate TND / mois", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                      ]),
-                      const SizedBox(height: 8),
-                      Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                        const Text("Durée du contrat", style: TextStyle(color: Colors.grey, fontSize: 13)),
-                        Text("$_rentalMonths mois", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                      ]),
-                      const Divider(height: 20),
-                      Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                        const Text("TOTAL CONTRAT", style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15)),
-                        Text("$_totalRentalPrice TND", style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 22, color: AppTheme.primary)),
-                      ]),
-                    ],
-                  ),
-                ),
-
-              const SizedBox(height: 32),
-              const Divider(height: 1, color: Colors.black12),
-              const SizedBox(height: 32),
-
-              _buildSectionHeader(Icons.admin_panel_settings_outlined, "V. ADMINISTRATION & NOTES"),
-              const SizedBox(height: 24),
-
-              _buildFieldLabel("Notes internes / Observations staff"),
-              _buildTextField(_internalNotesController, "Remarques sur le profil...", Icons.edit_note_outlined, isMultiline: true),
-              const SizedBox(height: 24),
-
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: AppTheme.primary.withOpacity(0.05),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppTheme.primary.withOpacity(0.1)),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.school_outlined, color: AppTheme.primary),
-                    const SizedBox(width: 16),
-                    const Expanded(
-                      child: Text(
-                        "Formation technique nécessaire",
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                      ),
-                    ),
-                    Switch(
-                      value: _formationNecessaire,
-                      onChanged: (val) => setState(() => _formationNecessaire = val),
-                      activeColor: AppTheme.primary,
-                    ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 40),
-
-              // --- PAYMENT MODULE ---
-              Container(
-                padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(
-                  color: _isPaymentConfirmed ? AppTheme.normalGreen.withOpacity(0.05) : Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: _isPaymentConfirmed ? AppTheme.normalGreen : Colors.orange.shade300,
-                    width: 2,
-                  ),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(
-                          _isPaymentConfirmed ? Icons.verified : Icons.payments_rounded,
-                          color: _isPaymentConfirmed ? AppTheme.normalGreen : Colors.orange,
-                          size: 28,
-                        ),
-                        const SizedBox(width: 12),
-                        const Text("VALIDATION DU PAIEMENT", style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
-                      ],
-                    ),
-                    const SizedBox(height: 20),
-                    if (!_isPaymentConfirmed) ...[
-                      // Payment breakdown
-                      Container(
-                        padding: const EdgeInsets.all(20),
-                        decoration: BoxDecoration(
-                          color: AppTheme.primary.withOpacity(0.04),
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: AppTheme.primary.withOpacity(0.15), width: 1.5),
-                        ),
-                        child: Column(
-                          children: [
-                            Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                              Text("$_selectedVersion (Canne)", style: const TextStyle(color: Colors.grey, fontSize: 13)),
-                              Text("$_monthlyRate TND / mois", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                            ]),
-                            const SizedBox(height: 8),
-                            Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                              const Text("Durée de location", style: TextStyle(color: Colors.grey, fontSize: 13)),
-                              Text("$_rentalMonths mois", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                            ]),
-                            const Padding(
-                              padding: EdgeInsets.symmetric(vertical: 12),
-                              child: Divider(height: 1, color: Colors.black12),
-                            ),
-                            Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                              const Text("TOTAL À PAYER", style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15)),
-                              Text("$_totalRentalPrice TND", style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 24, color: AppTheme.primary)),
-                            ]),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                      // Payment method
-                      Row(
-                        children: [
-                          _buildPaymentRadio("Espèces", Icons.money),
-                          const SizedBox(width: 12),
-                          _buildPaymentRadio("Carte", Icons.credit_card),
-                          const SizedBox(width: 12),
-                          _buildPaymentRadio("Virement", Icons.account_balance),
-                        ],
-                      ),
-                      const SizedBox(height: 24),
-                      SizedBox(
-                        width: double.infinity,
-                        height: 54,
-                        child: ElevatedButton.icon(
-                          onPressed: () => setState(() => _isPaymentConfirmed = true),
-                          icon: const Icon(Icons.check_circle_outline),
-                          label: const Text("CONFIRMER LA RÉCEPTION DU PAIEMENT", style: TextStyle(fontWeight: FontWeight.bold)),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.orange,
-                            foregroundColor: Colors.white,
-                            disabledBackgroundColor: Colors.grey.shade300,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          ),
-                        ),
-                      ),
-                    ] else ...[
-                      Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: AppTheme.normalGreen.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.check_circle, color: AppTheme.normalGreen),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Text(
-                                "PAIEMENT DE $_totalRentalPrice TND REÇU PAR $_paymentMethod",
-                                style: const TextStyle(fontWeight: FontWeight.bold, color: AppTheme.normalGreen),
-                              ),
-                            ),
-                            TextButton(
-                              onPressed: () => setState(() => _isPaymentConfirmed = false),
-                              child: const Text("Modifier", style: TextStyle(color: Colors.grey)),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 32),
-
-              SizedBox(
-                width: double.infinity,
-                height: 56,
-                child: ElevatedButton(
-                  onPressed: (_isPaymentConfirmed && !_isSubmitting) ? _submitRegistration : null,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: _isPaymentConfirmed ? AppTheme.primary : Colors.grey,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
-                  child: _isSubmitting
-                      ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                      : Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Icon(Icons.check_circle_outline, color: Colors.white, size: 20),
-                            const SizedBox(width: 12),
-                            Text(
-                              _isPaymentConfirmed ? "Enregistrer la Location" : "En Attente de Paiement",
-                              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
-                            ),
-                          ],
-                        ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 24),
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppTheme.normalGreen.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.verified, color: AppTheme.normalGreen),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  "Paiement de $_totalRentalPrice TND validé par $_paymentMethod",
+                  style: const TextStyle(fontWeight: FontWeight.bold, color: AppTheme.normalGreen),
                 ),
               ),
             ],
           ),
         ),
-      );
+      ],
+    );
   }
 
-  Widget _buildDurationButton(int months, String title) {
-    bool isSelected = _rentalMonths == months;
-    return InkWell(
-      onTap: () => setState(() => _rentalMonths = months),
-      borderRadius: BorderRadius.circular(12),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        alignment: Alignment.center,
-        padding: const EdgeInsets.symmetric(vertical: 16),
-        decoration: BoxDecoration(
-          color: isSelected ? AppTheme.primary.withOpacity(0.1) : Colors.grey.shade50,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: isSelected ? AppTheme.primary : Colors.grey.shade300,
-            width: isSelected ? 2 : 1,
-          ),
-        ),
-        child: Text(
-          title,
-          style: TextStyle(
-            color: isSelected ? AppTheme.primary : Colors.black87,
-            fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-            fontSize: 14,
-          ),
-        ),
+  Widget _infoRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: const TextStyle(color: Colors.grey)),
+          Text(value, style: const TextStyle(fontWeight: FontWeight.bold)),
+        ],
       ),
     );
   }
+
+  Widget _buildStepPayment() {
+    return _buildStepContainer(
+      title: "V. PAIEMENT ET VALIDATION",
+      icon: Icons.payments_outlined,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: _isPaymentConfirmed ? AppTheme.normalGreen.withOpacity(0.05) : Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: _isPaymentConfirmed ? AppTheme.normalGreen : Colors.orange.shade300,
+              width: 2,
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    _isPaymentConfirmed ? Icons.verified : Icons.payments_rounded,
+                    color: _isPaymentConfirmed ? AppTheme.normalGreen : Colors.orange,
+                    size: 28,
+                  ),
+                  const SizedBox(width: 12),
+                  const Text("VALIDATION DU PAIEMENT", style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
+                ],
+              ),
+              const SizedBox(height: 24),
+              if (!_isPaymentConfirmed) ...[
+                Row(
+                  children: [
+                    _buildPaymentRadio("Espèces", Icons.money),
+                    const SizedBox(width: 12),
+                    _buildPaymentRadio("Carte", Icons.credit_card),
+                    const SizedBox(width: 12),
+                    _buildPaymentRadio("Virement", Icons.account_balance),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  height: 54,
+                  child: ElevatedButton.icon(
+                    onPressed: () => setState(() => _isPaymentConfirmed = true),
+                    icon: const Icon(Icons.check_circle_outline),
+                    label: const Text("CONFIRMER LE PAIEMENT"),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.orange,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                ),
+              ] else ...[
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: AppTheme.normalGreen.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.check_circle, color: AppTheme.normalGreen),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          "Paiement de $_totalRentalPrice TND reçu par $_paymentMethod",
+                          style: const TextStyle(fontWeight: FontWeight.bold, color: AppTheme.normalGreen),
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: () => setState(() => _isPaymentConfirmed = false),
+                        icon: const Icon(Icons.edit, size: 20, color: Colors.grey),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+        const SizedBox(height: 32),
+        _buildFieldLabel("Notes internes / Observations"),
+        _buildTextField(_internalNotesController, "Remarques...", Icons.edit_note_outlined, isMultiline: true, validator: (v) => null),
+      ],
+    );
+  }
+
+  Widget _buildFormSection() => const SizedBox();
+
 
   Widget _buildPaymentRadio(String method, IconData icon) {
     bool isSelected = _paymentMethod == method;
@@ -1040,10 +1085,12 @@ class _CaneRentalsPageState extends State<CaneRentalsPage> {
     TextEditingController controller, 
     String hint, 
     IconData icon, 
-    {bool isNumber = false, bool isMultiline = false}
+    {bool isNumber = false, bool isMultiline = false, String? Function(String?)? validator, bool readOnly = false, bool enabled = true}
   ) {
     return TextFormField(
       controller: controller,
+      readOnly: readOnly,
+      enabled: enabled,
       maxLines: isMultiline ? 3 : 1,
       keyboardType: isMultiline 
           ? TextInputType.multiline 
@@ -1069,7 +1116,7 @@ class _CaneRentalsPageState extends State<CaneRentalsPage> {
           borderSide: const BorderSide(color: AppTheme.primary, width: 2),
         ),
       ),
-      validator: (value) => value == null || value.isEmpty ? "Champ requis" : null,
+      validator: validator ?? ((value) => value == null || value.isEmpty ? "Champ requis" : null),
     );
   }
 
@@ -1083,16 +1130,24 @@ class _CaneRentalsPageState extends State<CaneRentalsPage> {
       "full_name": _fullNameController.text,
       "birth_date": _birthDateController.text,
       "age": _calculatedAge?.toString() ?? "0",
+      "adresse": "${_streetController.text.trim()}, ${_cityController.text.trim()} ${_postalCodeController.text.trim()}, ${_countryController.text.trim()}".trim(),
+      "email": _emailController.text.trim(),
+      "telephone": _phoneController.text.trim(),
       "cin": _cinController.text,
       "phone": _phoneController.text,
-      "address": _addressController.text,
+      "address": {
+        "street": _streetController.text.trim(),
+        "city": _cityController.text.trim(),
+        "postal_code": _postalCodeController.text.trim(),
+        "country": _countryController.text.trim(),
+      },
       "health_notes": _healthNotesController.text,
       "emergency_name": _emergencyNameController.text,
       "emergency_phone": _emergencyPhoneController.text,
       "emergency_relation": _emergencyRelationController.text,
       "start_date": _startDateController.text,
-      "end_date": _calculatedEndDate,
-      "duration_months": _rentalMonths,
+      "end_date": _endDateController.text,
+      "duration_months": _rentalDurationMonths,
       "internal_notes": _internalNotesController.text,
       "model": _selectedVersion,
       "formation_needed": _formationNecessaire,
@@ -1288,22 +1343,7 @@ class _CaneVersionCardState extends State<_CaneVersionCard> {
                     ],
                   ),
                 )),
-                const SizedBox(height: 30),
-                SizedBox(
-                  width: double.infinity,
-                  height: 54,
-                  child: ElevatedButton(
-                    onPressed: widget.onTap,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.white,
-                      foregroundColor: const Color(0xFF1D1D1F),
-                      elevation: 8, // Effet 3D sur le bouton
-                      shadowColor: Colors.black45,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                    ),
-                    child: const Text("Louer maintenant", style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
-                  ),
-                ),
+                const SizedBox(height: 10),
               ],
             ),
           ),
@@ -1386,20 +1426,6 @@ class _CaneVersionCardState extends State<_CaneVersionCard> {
                   ),
                 )),
                 const Spacer(),
-                SizedBox(
-                  width: double.infinity,
-                  height: 52,
-                  child: ElevatedButton(
-                    onPressed: widget.onTap,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: _isHovered || widget.isSelected ? AppTheme.primary : const Color(0xFFF2F2F7),
-                      foregroundColor: _isHovered || widget.isSelected ? Colors.white : AppTheme.primary,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                    child: const Text("Louer maintenant", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                  ),
-                ),
               ],
             ),
           ),

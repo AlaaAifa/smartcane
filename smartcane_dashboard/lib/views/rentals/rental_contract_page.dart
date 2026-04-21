@@ -22,6 +22,10 @@ class RentalContractPage extends StatelessWidget {
       backgroundColor: Colors.grey.shade100,
       appBar: AppBar(
         backgroundColor: AppTheme.sidebarBg,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 20),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
         title: const Text("Contrat de Location", style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
         actions: [
           Padding(
@@ -108,6 +112,7 @@ class RentalContractPage extends StatelessWidget {
                       child: _infoBlock([
                         _contractRow("Nom & Prénom", rentalData['full_name'] ?? 'N/A'),
                         _contractRow("CIN", rentalData['cin'] ?? 'N/A'),
+                        _contractRow("Email", rentalData['email'] ?? 'N/A'),
                         _contractRow("Téléphone", rentalData['phone'] ?? 'N/A'),
                         _contractRow("Date de Naissance", rentalData['birth_date'] ?? 'N/A'),
                       ]),

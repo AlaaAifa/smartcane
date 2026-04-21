@@ -22,6 +22,10 @@ class SalesContractPage extends StatelessWidget {
       backgroundColor: Colors.grey.shade100,
       appBar: AppBar(
         backgroundColor: AppTheme.sidebarBg,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 20),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
         title: const Text("Contrat de Vente", style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
         actions: [
           Padding(
@@ -57,7 +61,7 @@ class SalesContractPage extends StatelessWidget {
                       children: [
                         const Text("CONTRAT DE VENTE", style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: AppTheme.primary)),
                         const SizedBox(height: 8),
-                        _labelValue("N Contrat", contractNum),
+                        _labelValue("N° Contrat", contractNum),
                         _labelValue("Date", dateStr),
                       ],
                     ),
@@ -66,33 +70,42 @@ class SalesContractPage extends StatelessWidget {
                 const SizedBox(height: 32),
                 const Divider(thickness: 2, color: AppTheme.primary),
                 const SizedBox(height: 24),
-                _sectionTitle("Client"),
+                _sectionTitle("Bénéficiaire"),
                 const SizedBox(height: 12),
                 _infoBlock([
-                  _contractRow("Nom", saleData["nom"]?.toString() ?? "N/A"),
+                  _contractRow("Nom Complet", saleData["nom"]?.toString() ?? "N/A"),
                   _contractRow("CIN", saleData["cin"]?.toString() ?? "N/A"),
+                  _contractRow("Date de Naissance", saleData["birth_date"]?.toString() ?? "N/A"),
                   _contractRow("Email", saleData["email"]?.toString() ?? "N/A"),
-                  _contractRow("Telephone", saleData["numero_de_telephone"]?.toString() ?? "N/A"),
-                  _contractRow("Contact familial", saleData["contact_familial"]?.toString() ?? "N/A"),
-                  _contractRow("Adresse", saleData["adresse"]?.toString() ?? "N/A"),
+                  _contractRow("Téléphone", saleData["numero_de_telephone"]?.toString() ?? "N/A"),
+                  _contractRow("Adresse", _formatAddress(saleData['address'])),
                 ]),
                 const SizedBox(height: 24),
-                _sectionTitle("Produit"),
+                _sectionTitle("Urgence"),
                 const SizedBox(height: 12),
                 _infoBlock([
-                  _contractRow("Modele", saleData["version_canne"]?.toString() ?? "Smart Cane"),
-                  _contractRow("SIM canne", saleData["sim_de_la_canne"]?.toString() ?? "N/A"),
-                  _contractRow("Prix canne", "${saleData['payment_info']?['cane_price'] ?? 'N/A'} TND"),
-                  _contractRow("Abonnement", saleData['payment_info']?['subscription_period']?.toString() ?? "Sans abonnement"),
-                  _contractRow("Prix abonnement", "${saleData['payment_info']?['subscription_price'] ?? '0'} TND"),
-                  _contractRow("Total", "${saleData['payment_info']?['amount'] ?? 'N/A'} TND"),
+                  _contractRow("Contact d'urgence", saleData["emergency_name"]?.toString() ?? "N/A"),
+                  _contractRow("Relation", saleData["emergency_relation"]?.toString() ?? "N/A"),
+                  _contractRow("Téléphone Urgence", saleData["emergency_phone"]?.toString() ?? "N/A"),
                 ]),
                 const SizedBox(height: 24),
-                _sectionTitle("Paiement"),
+                _sectionTitle("Détails Acquisition"),
                 const SizedBox(height: 12),
                 _infoBlock([
-                  _contractRow("Mode de paiement", saleData['payment_info']?['method']?.toString() ?? "N/A"),
-                  _contractRow("Garantie", saleData['payment_info']?['warranty']?.toString() ?? "N/A"),
+                  _contractRow("Modèle Canne", saleData["version_canne"]?.toString() ?? "Smart Cane"),
+                  _contractRow("Numéro SIM", saleData["sim_de_la_canne"]?.toString() ?? "N/A"),
+                  _contractRow("Prix Équipement", "${saleData['payment_info']?['cane_price'] ?? 'N/A'} TND"),
+                  _contractRow("Durée Abonnement", "${saleData['payment_info']?['subscription_duration_months'] ?? '0'} mois"),
+                  _contractRow("Période", "Du ${saleData['payment_info']?['subscription_start']} au ${saleData['payment_info']?['subscription_end']}"),
+                  _contractRow("Prix Abonnement", "${saleData['payment_info']?['subscription_price'] ?? '0'} TND"),
+                  _contractRow("TOTAL TTC", "${saleData['payment_info']?['total_amount'] ?? 'N/A'} TND"),
+                ]),
+                const SizedBox(height: 24),
+                _sectionTitle("Paiement & Garantie"),
+                const SizedBox(height: 12),
+                _infoBlock([
+                  _contractRow("Mode de règlement", saleData['payment_info']?['method']?.toString() ?? "N/A"),
+                  _contractRow("Garantie Matériel", "2 ans (Pièces et main d'œuvre)"),
                 ]),
                 const SizedBox(height: 40),
                 const Text(
@@ -101,10 +114,10 @@ class SalesContractPage extends StatelessWidget {
                 ),
                 const SizedBox(height: 48),
                 Row(
-                  children: const [
-                    Expanded(child: _SignatureBlock(title: "Le Client")),
-                    SizedBox(width: 40),
-                    Expanded(child: _SignatureBlock(title: "Representant Smart Cane")),
+                  children: [
+                    const Expanded(child: _SignatureBlock(title: "Le Client")),
+                    const SizedBox(width: 40),
+                    const Expanded(child: _SignatureBlock(title: "Representant Smart Cane")),
                   ],
                 ),
               ],
@@ -113,6 +126,18 @@ class SalesContractPage extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  String _formatAddress(dynamic address) {
+    if (address == null) return 'Non renseignée';
+    if (address is Map) {
+      final street = address['street']?.toString() ?? '';
+      final city = address['city']?.toString() ?? '';
+      final postal = address['postal_code']?.toString() ?? '';
+      final country = address['country']?.toString() ?? '';
+      return [street, city, postal, country].where((e) => e.isNotEmpty).join(', ');
+    }
+    return address.toString();
   }
 
   Widget _sectionTitle(String title) {

@@ -28,16 +28,26 @@ class RentalService {
 
   static Future<bool> rentCane(Map<String, dynamic> data) async {
     try {
-      // 1. Create User
+      // 1. Format Address correctly for backend (String)
+      String formattedAddress = "";
+      if (data["address"] is Map) {
+        final addr = data["address"];
+        formattedAddress = "${addr['street'] ?? ''}, ${addr['city'] ?? ''} ${addr['postal_code'] ?? ''}, ${addr['country'] ?? ''}".trim();
+        if (formattedAddress.startsWith(',')) formattedAddress = formattedAddress.substring(1).trim();
+      } else {
+        formattedAddress = data["adresse"]?.toString() ?? "";
+      }
+
+      // 2. Create User
       final userRes = await http.post(
         Uri.parse("${BaseService.baseUrl}/users"),
         headers: BaseService.headers,
         body: jsonEncode({
           "cin": data["cin"], 
           "nom": data["full_name"],
-          "age": int.tryParse(data["age"] ?? "0") ?? 0,
-          "adresse": data["address"],
-          "email": "${data['cin']}@smartcane.com", 
+          "age": int.tryParse(data["age"]?.toString() ?? "0") ?? 0,
+          "adresse": formattedAddress,
+          "email": data["email"]?.toString().isNotEmpty == true ? data["email"] : "${data['cin']}@smartcane.com", 
           "numero_de_telephone": data["phone"],
           "contact_familial": data["emergency_phone"],
           "etat_de_sante": data["health_notes"],
@@ -52,13 +62,16 @@ class RentalService {
       }
 
       if (userRes.statusCode == 400) {
-        await UserService.updateUser(data["cin"], {
+        final resUpdate = await UserService.updateUser(data["cin"], {
           "nom": data["full_name"],
-          "adresse": data["address"],
+          "adresse": formattedAddress,
           "numero_de_telephone": data["phone"],
           "sim_de_la_canne": data["sim_number"],
           "etat_de_sante": data["health_notes"],
         });
+        if (!resUpdate["success"]) {
+           print("Rental User Update failed: ${resUpdate["error"]}");
+        }
       }
 
       // 2. Create Location (Rental)

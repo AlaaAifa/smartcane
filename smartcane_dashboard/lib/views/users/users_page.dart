@@ -166,7 +166,7 @@ class _UsersPageState extends State<UsersPage> {
             if (isEditing)
               ElevatedButton(
                 onPressed: () async {
-                  final success = await UserService.updateUser(
+                  final result = await UserService.updateUser(
                     user["cin"].toString(),
                     {
                       "nom": nameCtrl.text.trim(),
@@ -183,7 +183,7 @@ class _UsersPageState extends State<UsersPage> {
                     return;
                   }
 
-                  if (success) {
+                  if (result["success"]) {
                     Navigator.pop(ctx);
                     _loadUsers();
                     ScaffoldMessenger.of(context).showSnackBar(
@@ -191,7 +191,7 @@ class _UsersPageState extends State<UsersPage> {
                     );
                   } else {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text("Echec de la mise a jour"), backgroundColor: AppTheme.sosRed),
+                      SnackBar(content: Text("Echec: ${result["error"] ?? "Erreur inconnue"}"), backgroundColor: AppTheme.sosRed),
                     );
                   }
                 },

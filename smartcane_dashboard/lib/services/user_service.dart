@@ -18,24 +18,28 @@ class UserService {
     return _lastFetchedUsers;
   }
 
-  static Future<bool> addUser(Map<String, dynamic> user) async {
+  static Future<Map<String, dynamic>> addUser(Map<String, dynamic> user) async {
     try {
       final res = await http.post(Uri.parse("${BaseService.baseUrl}/users"), headers: BaseService.headers, body: jsonEncode(user));
-      return res.statusCode == 201;
+      if (res.statusCode == 201) return {"success": true};
+      final body = jsonDecode(res.body);
+      return {"success": false, "error": body['detail'] ?? "Erreur inconnue"};
     } catch (e) {
       print("Add user error: $e");
+      return {"success": false, "error": e.toString()};
     }
-    return false;
   }
 
-  static Future<bool> updateUser(String cin, Map<String, dynamic> user) async {
+  static Future<Map<String, dynamic>> updateUser(String cin, Map<String, dynamic> user) async {
     try {
       final res = await http.put(Uri.parse("${BaseService.baseUrl}/users/$cin"), headers: BaseService.headers, body: jsonEncode(user));
-      return res.statusCode == 200;
+      if (res.statusCode == 200) return {"success": true};
+      final body = jsonDecode(res.body);
+      return {"success": false, "error": body['detail'] ?? "Erreur inconnue"};
     } catch (e) {
       print("Update user error: $e");
+      return {"success": false, "error": e.toString()};
     }
-    return false;
   }
 
   static Future<Map<String, dynamic>?> getUserByCin(String cin) async {
