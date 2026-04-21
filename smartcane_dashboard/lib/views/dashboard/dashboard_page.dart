@@ -47,7 +47,6 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   Set<String> get _renterIds => activeRentals
-      .where((rental) => rental["date_de_retour"] == null)
       .map((rental) => rental["cin_utilisateur"]?.toString() ?? "")
       .where((cin) => cin.isNotEmpty)
       .toSet();
@@ -160,7 +159,7 @@ class _DashboardPageState extends State<DashboardPage> {
             const SizedBox(height: 32),
             Row(
               children: [
-                _statCard("Clients", users.length.toString(), Icons.people_alt_rounded, AppTheme.primary),
+                _statCard("Clients", _subscribers.length.toString(), Icons.people_alt_rounded, AppTheme.primary),
                 const SizedBox(width: 24),
                 _statCard("Locations actives", _renters.length.toString(), Icons.vpn_key_rounded, AppTheme.normalGreen),
                 const SizedBox(width: 24),

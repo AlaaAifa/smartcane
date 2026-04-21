@@ -13,9 +13,8 @@ class CaneRentalsPage extends StatefulWidget {
 class _CaneRentalsPageState extends State<CaneRentalsPage> {
   final _formKey = GlobalKey<FormState>();
   final _fullNameController = TextEditingController();
-  int? _birthDay;
-  int? _birthMonth;
-  int? _birthYear;
+  final _birthDateController = TextEditingController();
+  DateTime? _selectedBirthDate;
   int? _calculatedAge;
   
   final _cinController = TextEditingController();
@@ -79,6 +78,7 @@ class _CaneRentalsPageState extends State<CaneRentalsPage> {
   @override
   void dispose() {
     _fullNameController.dispose();
+    _birthDateController.dispose();
     _cinController.dispose();
     _phoneController.dispose();
     _addressController.dispose();
@@ -118,13 +118,41 @@ class _CaneRentalsPageState extends State<CaneRentalsPage> {
     }
   }
 
+  Future<void> _selectBirthDate(BuildContext context) async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedBirthDate ?? DateTime(2000),
+      firstDate: DateTime(1900),
+      lastDate: DateTime.now(),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: const ColorScheme.light(
+              primary: AppTheme.primary,
+              onPrimary: Colors.white,
+              onSurface: Colors.black87,
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+    if (picked != null && picked != _selectedBirthDate) {
+      setState(() {
+        _selectedBirthDate = picked;
+        _birthDateController.text = "${picked.day}/${picked.month}/${picked.year}";
+        _updateAge();
+      });
+    }
+  }
+
   void _updateAge() {
-    if (_birthDay == null || _birthMonth == null || _birthYear == null) return;
+    if (_selectedBirthDate == null) return;
     
     final now = DateTime.now();
-    int age = now.year - _birthYear!;
+    int age = now.year - _selectedBirthDate!.year;
     
-    if (now.month < _birthMonth! || (now.month == _birthMonth! && now.day < _birthDay!)) {
+    if (now.month < _selectedBirthDate!.month || (now.month == _selectedBirthDate!.month && now.day < _selectedBirthDate!.day)) {
       age--;
     }
     
@@ -132,11 +160,6 @@ class _CaneRentalsPageState extends State<CaneRentalsPage> {
       _calculatedAge = age;
     });
   }
-
-  // Generate lists for birth date
-  final List<int> _days = List.generate(31, (index) => index + 1);
-  final List<int> _months = List.generate(12, (index) => index + 1);
-  final List<int> _years = List.generate(100, (index) => DateTime.now().year - index);
 
   // Helpers for Details Card
   String _getDescriptionForVersion() {
@@ -167,15 +190,6 @@ class _CaneRentalsPageState extends State<CaneRentalsPage> {
       case "Smart Pro V2": return ["Radar à ultrasons (3m)", "Retour haptique", "Bluetooth IoT"];
       case "Smart Pro V3": return ["Caméra IA & LiDAR", "Connexion 5G", "Assistance vocale"];
       default: return [];
-    }
-  }
-
-  String _getImagePath() {
-    switch (_selectedVersion) {
-      case "Smart Lite": return "assets/images/smart_lite.png";
-      case "Smart Pro V2": return "assets/images/smart_pro_v2.png";
-      case "Smart Pro V3": return "assets/images/smart_pro_v3.png";
-      default: return "";
     }
   }
 
@@ -299,93 +313,40 @@ class _CaneRentalsPageState extends State<CaneRentalsPage> {
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       crossAxisCount: 3,
-      childAspectRatio: 0.85,
-      crossAxisSpacing: 24,
+      childAspectRatio: 0.58, 
+      crossAxisSpacing: 32,
       children: [
-        _buildModernVersionCard("Smart Lite", "Légèreté & Simplicité", Icons.light_mode_outlined, [
-          "Détection 1.5m", "Poids 200g", "Sans abonnement"
-        ]),
-        _buildModernVersionCard("Smart Pro V2", "Précision & Feedback", Icons.sensors_outlined, [
-          "Radar ultrason (3m)", "Vibrations haptiques", "Bluetooth App"
-        ]),
-        _buildModernVersionCard("Smart Pro V3", "IA & Connectivité", Icons.psychology_outlined, [
-          "Caméra IA & LiDAR", "Assistance vocale 5G", "Soutien total"
-        ]),
+        _CaneVersionCard(
+          title: "Smart Lite",
+          subtitle: "L'essentiel pour une mobilité urbaine simple et sécurisée.",
+          badge: "ESSENTIEL",
+          badgeColor: Colors.blue.shade600,
+          features: ["Détection d'obstacles", "Alertes vibrations", "Ultra légère"],
+          isSelected: _selectedVersion == "Smart Lite",
+          isFullOverlay: true, 
+          onTap: () => setState(() { _selectedVersion = "Smart Lite"; _currentStep = 1; }),
+        ),
+        _CaneVersionCard(
+          title: "Smart Pro V2",
+          subtitle: "Technologie avancée avec retour haptique et connexion mobile.",
+          badge: "AVANCÉ",
+          badgeColor: Colors.indigo.shade600,
+          features: ["Radar longue portée", "Alertes temps réel", "GPS Assisté"],
+          isSelected: _selectedVersion == "Smart Pro V2",
+          isFullOverlay: true,
+          onTap: () => setState(() { _selectedVersion = "Smart Pro V2"; _currentStep = 1; }),
+        ),
+        _CaneVersionCard(
+          title: "Smart Pro V3",
+          subtitle: "L'excellence technologique avec IA et vision augmentée.",
+          badge: "PREMIUM",
+          badgeColor: const Color(0xFF6200EA),
+          features: ["Caméra IA & LiDAR", "Navigation 5G", "Assistance totale"],
+          isSelected: _selectedVersion == "Smart Pro V3",
+          isFullOverlay: true,
+          onTap: () => setState(() { _selectedVersion = "Smart Pro V3"; _currentStep = 1; }),
+        ),
       ],
-    );
-  }
-
-  Widget _buildModernVersionCard(String title, String subtitle, IconData icon, List<String> shortFeatures) {
-    bool isSelected = _selectedVersion == title;
-    return InkWell(
-      onTap: () {
-        setState(() {
-          _selectedVersion = title;
-          _currentStep = 1;
-        });
-      },
-      borderRadius: BorderRadius.circular(24),
-      child: Container(
-        padding: const EdgeInsets.all(24),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: isSelected ? AppTheme.primary : Colors.transparent, width: 2),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 20,
-              offset: const Offset(0, 10),
-            )
-          ],
-        ),
-        child: Column(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: AppTheme.primary.withOpacity(0.05),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(icon, color: AppTheme.primary, size: 48),
-            ),
-            const SizedBox(height: 24),
-            Text(title, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Colors.black87)),
-            const SizedBox(height: 8),
-            Text(subtitle, textAlign: TextAlign.center, style: TextStyle(color: Colors.grey.withOpacity(0.8), fontSize: 13)),
-            const Spacer(),
-            ...shortFeatures.map((f) => Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Row(
-                children: [
-                  const Icon(Icons.check_circle_rounded, color: AppTheme.normalGreen, size: 16),
-                  const SizedBox(width: 8),
-                  Expanded(child: Text(f, style: const TextStyle(fontSize: 12, color: Colors.black54))),
-                ],
-              ),
-            )),
-            const Spacer(),
-            Container(
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              width: double.infinity,
-              decoration: BoxDecoration(
-                color: isSelected ? AppTheme.primary : AppTheme.primary.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Center(
-                child: Text(
-                  "CHOISIR",
-                  style: TextStyle(
-                    color: isSelected ? Colors.white : AppTheme.primary,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 1.2,
-                  ),
-                ),
-              ),
-            )
-          ],
-        ),
-      ),
     );
   }
 
@@ -415,9 +376,9 @@ class _CaneRentalsPageState extends State<CaneRentalsPage> {
                         color: AppTheme.primary.withOpacity(0.1),
                         borderRadius: BorderRadius.circular(20),
                       ),
-                      child: Text(
+                      child: const Text(
                         "DISPONIBLE",
-                        style: const TextStyle(color: AppTheme.primary, fontWeight: FontWeight.bold, fontSize: 11),
+                        style: TextStyle(color: AppTheme.primary, fontWeight: FontWeight.bold, fontSize: 11),
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -608,37 +569,22 @@ class _CaneRentalsPageState extends State<CaneRentalsPage> {
               ),
               const SizedBox(height: 20),
 
-              _buildFieldLabel("Date de naissance"),
               Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Expanded(
-                    child: _buildDropdownField(
-                      "Jour", 
-                      _birthDay, 
-                      _days, 
-                      (val) { setState(() => _birthDay = val); _updateAge(); },
-                      (val) => val == null ? "Requis" : null
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _buildDropdownField(
-                      "Mois", 
-                      _birthMonth, 
-                      _months, 
-                      (val) { setState(() => _birthMonth = val); _updateAge(); },
-                      (val) => val == null ? "Requis" : null
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    flex: 2,
-                    child: _buildDropdownField(
-                      "Année", 
-                      _birthYear, 
-                      _years, 
-                      (val) { setState(() => _birthYear = val); _updateAge(); },
-                      (val) => val == null ? "Requis" : null
+                    flex: 3,
+                    child: GestureDetector(
+                      onTap: () => _selectBirthDate(context),
+                      child: AbsorbPointer(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _buildFieldLabel("Date de naissance"),
+                            _buildTextField(_birthDateController, "Sélectionner...", Icons.calendar_today_outlined),
+                          ],
+                        ),
+                      ),
                     ),
                   ),
                 ],
@@ -1000,6 +946,7 @@ class _CaneRentalsPageState extends State<CaneRentalsPage> {
         ),
       );
   }
+
   Widget _buildDurationButton(int months, String title) {
     bool isSelected = _rentalMonths == months;
     return InkWell(
@@ -1061,172 +1008,6 @@ class _CaneRentalsPageState extends State<CaneRentalsPage> {
     );
   }
 
-  Widget _buildVersionButton(String title, String subtitle) {
-    bool isSelected = _selectedVersion == title;
-    return InkWell(
-      onTap: () => setState(() => _selectedVersion = title),
-      borderRadius: BorderRadius.circular(12),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-        decoration: BoxDecoration(
-          color: isSelected ? AppTheme.primary.withOpacity(0.08) : Colors.grey.shade50,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: isSelected ? AppTheme.primary : Colors.grey.shade200,
-            width: isSelected ? 2 : 1,
-          ),
-        ),
-        child: Row(
-          children: [
-            Icon(
-              isSelected ? Icons.radio_button_checked : Icons.radio_button_off,
-              color: isSelected ? AppTheme.primary : Colors.grey,
-            ),
-            const SizedBox(width: 16),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: TextStyle(
-                    color: isSelected ? AppTheme.primary : Colors.black87,
-                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                    fontSize: 16,
-                  ),
-                ),
-                Text(
-                  subtitle,
-                  style: TextStyle(
-                    color: isSelected ? AppTheme.primary.withOpacity(0.7) : Colors.grey,
-                    fontSize: 12,
-                  ),
-                ),
-              ],
-            ),
-            const Spacer(),
-            if (isSelected)
-              const Icon(Icons.check_circle, color: AppTheme.primary, size: 20),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDetailsSection() {
-    final features = _getFeaturesForVersion();
-
-    return Container(
-      padding: const EdgeInsets.all(32),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
-          )
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-            const Text(
-              "Détails du Modèle",
-              style: TextStyle(color: AppTheme.primary, fontSize: 18, fontWeight: FontWeight.w800),
-            ),
-            const SizedBox(height: 24),
-            // Espace Photo
-            ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: Container(
-                height: 220,
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade50,
-                  border: Border.all(color: Colors.grey.shade200),
-                ),
-                child: Image.asset(
-                  _getImagePath(),
-                  fit: BoxFit.contain,
-                  errorBuilder: (context, error, stackTrace) {
-                    return Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.image_not_supported_outlined, size: 48, color: Colors.grey.shade300),
-                        const SizedBox(height: 12),
-                        Text(
-                          "Photo manquante : ${_getImagePath().split('/').last}", 
-                          style: TextStyle(color: Colors.grey.shade400, fontSize: 12)
-                        ),
-                      ],
-                    );
-                  },
-                  frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
-                    if (wasSynchronouslyLoaded) return child;
-                    return AnimatedOpacity(
-                      opacity: frame == null ? 0 : 1,
-                      duration: const Duration(milliseconds: 500),
-                      curve: Curves.easeOut,
-                      child: child,
-                    );
-                  },
-                ),
-              ),
-            ),
-            const SizedBox(height: 24),
-            
-            Text(
-              _selectedVersion,
-              style: const TextStyle(color: Colors.black87, fontSize: 24, fontWeight: FontWeight.w900),
-            ),
-            const SizedBox(height: 6),
-            
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                color: AppTheme.normalGreen.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: Text(
-                _getPriceForVersion(),
-                style: const TextStyle(color: AppTheme.normalGreen, fontSize: 13, fontWeight: FontWeight.bold),
-              ),
-            ),
-            
-            const SizedBox(height: 24),
-            const Text(
-              "Description",
-              style: TextStyle(color: Colors.black54, fontWeight: FontWeight.bold, fontSize: 13),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              _getDescriptionForVersion(),
-              style: TextStyle(color: Colors.black87.withOpacity(0.7), fontSize: 14, height: 1.5),
-            ),
-            
-            const SizedBox(height: 24),
-            const Text(
-              "Fonctionnalités incluses",
-              style: TextStyle(color: Colors.black54, fontWeight: FontWeight.bold, fontSize: 13),
-            ),
-            const SizedBox(height: 12),
-            ...features.map((f) => Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Row(
-                children: [
-                  const Icon(Icons.check_circle, color: AppTheme.normalGreen, size: 16),
-                  const SizedBox(width: 12),
-                  Text(f, style: const TextStyle(color: Colors.black87, fontSize: 14)),
-                ],
-              ),
-            )),
-          ],
-        ),
-      );
-  }
-
   Widget _buildFieldLabel(String label) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
@@ -1234,49 +1015,6 @@ class _CaneRentalsPageState extends State<CaneRentalsPage> {
         label,
         style: const TextStyle(color: Colors.black87, fontSize: 13, fontWeight: FontWeight.bold),
       ),
-    );
-  }
-
-  Widget _buildDropdownField<T>(
-    String label, 
-    T? value, 
-    List<T> items, 
-    void Function(T?) onChanged,
-    String? Function(T?)? validator,
-  ) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildFieldLabel(label),
-        DropdownButtonFormField<T>(
-          value: value,
-          items: items.map((item) {
-            return DropdownMenuItem<T>(
-              value: item,
-              child: Text(item.toString()),
-            );
-          }).toList(),
-          onChanged: onChanged,
-          validator: validator,
-          decoration: InputDecoration(
-            filled: true,
-            fillColor: Colors.grey.shade50,
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: Colors.grey.shade200),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: Colors.grey.shade200),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: AppTheme.primary, width: 2),
-            ),
-          ),
-        ),
-      ],
     );
   }
 
@@ -1343,7 +1081,7 @@ class _CaneRentalsPageState extends State<CaneRentalsPage> {
     // 1. Collect all data
     final Map<String, dynamic> rentalData = {
       "full_name": _fullNameController.text,
-      "birth_date": "$_birthDay/$_birthMonth/$_birthYear",
+      "birth_date": _birthDateController.text,
       "age": _calculatedAge?.toString() ?? "0",
       "cin": _cinController.text,
       "phone": _phoneController.text,
@@ -1386,5 +1124,287 @@ class _CaneRentalsPageState extends State<CaneRentalsPage> {
         ));
       }
     }
+  }
+}
+
+class _CaneVersionCard extends StatefulWidget {
+  final String title;
+  final String subtitle;
+  final String badge;
+  final Color badgeColor;
+  final List<String> features;
+  final bool isSelected;
+  final bool isFullOverlay;
+  final VoidCallback onTap;
+
+  const _CaneVersionCard({
+    required this.title,
+    required this.subtitle,
+    required this.badge,
+    required this.badgeColor,
+    required this.features,
+    required this.isSelected,
+    this.isFullOverlay = false,
+    required this.onTap,
+  });
+
+  @override
+  State<_CaneVersionCard> createState() => _CaneVersionCardState();
+}
+
+class _CaneVersionCardState extends State<_CaneVersionCard> {
+  bool _isHovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    String imagePath = "";
+    IconData defaultIcon = Icons.sensors;
+    final String title = widget.title.toLowerCase();
+
+    if (title.contains("lite")) {
+      imagePath = "assets/images/smart_lite.png";
+      defaultIcon = Icons.light_mode_outlined;
+    } else if (title.contains("v2")) {
+      imagePath = "assets/images/smart_pro_v2.png";
+      defaultIcon = Icons.sensors_outlined;
+    } else {
+      imagePath = "assets/images/smart_pro_v3.png";
+      defaultIcon = Icons.psychology_outlined;
+    }
+
+    return MouseRegion(
+      onEnter: (_) => setState(() => _isHovered = true),
+      onExit: (_) => setState(() => _isHovered = false),
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: AnimatedScale(
+          duration: const Duration(milliseconds: 300),
+          scale: _isHovered ? 1.02 : 1.0,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeOut,
+            transform: Matrix4.identity()..translate(0.0, _isHovered ? -8.0 : 0.0),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: _isHovered || widget.isSelected ? AppTheme.primary.withOpacity(0.5) : Colors.grey.shade100,
+                width: _isHovered || widget.isSelected ? 2 : 1,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(_isHovered ? 0.15 : 0.05),
+                  blurRadius: _isHovered ? 35 : 15,
+                  offset: Offset(0, _isHovered ? 18 : 8),
+                ),
+              ],
+            ),
+            child: _buildFullOverlayLayout(imagePath, defaultIcon),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFullOverlayLayout(String imagePath, IconData defaultIcon) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(19),
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          // 1. Single Background Image (Full screen / Immersive)
+          Image.asset(
+            imagePath,
+            fit: BoxFit.cover,
+            alignment: const Alignment(0, -0.5), // Cadrage visuel optimal pour objet vertical
+          ),
+          
+          // 2. Linear Gradient for Readability
+          Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Colors.black.withOpacity(0.0),
+                  Colors.black.withOpacity(0.1),
+                  Colors.black.withOpacity(0.4),
+                  Colors.black.withOpacity(0.9),
+                ],
+                stops: const [0.0, 0.3, 0.6, 1.0],
+              ),
+            ),
+          ),
+          
+          // 3. Content
+          Padding(
+            padding: const EdgeInsets.all(28),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: widget.badgeColor,
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    widget.badge,
+                    style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Text(
+                  widget.title,
+                  style: const TextStyle(
+                    fontSize: 32,
+                    fontWeight: FontWeight.w900,
+                    color: Colors.white,
+                    letterSpacing: -0.8,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  widget.subtitle,
+                  maxLines: 2,
+                  style: TextStyle(
+                    fontSize: 15,
+                    color: Colors.white.withOpacity(0.85),
+                    height: 1.4,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                ...widget.features.map((f) => Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.check_circle_rounded, color: AppTheme.normalGreen, size: 16),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(f, style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w500)),
+                      ),
+                    ],
+                  ),
+                )),
+                const SizedBox(height: 30),
+                SizedBox(
+                  width: double.infinity,
+                  height: 54,
+                  child: ElevatedButton(
+                    onPressed: widget.onTap,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.white,
+                      foregroundColor: const Color(0xFF1D1D1F),
+                      elevation: 8, // Effet 3D sur le bouton
+                      shadowColor: Colors.black45,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    ),
+                    child: const Text("Louer maintenant", style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCleanProLayout(String imagePath, IconData defaultIcon) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          height: 200,
+          width: double.infinity,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+            border: Border(bottom: BorderSide(color: Colors.grey.shade100, width: 1)),
+          ),
+          child: ClipRRect(
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+            child: Stack(
+              children: [
+                Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(15),
+                    child: Hero(
+                      tag: 'cane_image_${widget.title}',
+                      child: Image.asset(
+                        imagePath,
+                        fit: BoxFit.contain,
+                        alignment: Alignment.center,
+                        errorBuilder: (context, error, stackTrace) => 
+                            Icon(defaultIcon, size: 60, color: widget.badgeColor.withOpacity(0.1)),
+                      ),
+                    ),
+                  ),
+                ),
+                Positioned(
+                  top: 12,
+                  right: 12,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: widget.badgeColor.withOpacity(0.08),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: widget.badgeColor.withOpacity(0.1), width: 0.5),
+                    ),
+                    child: Text(
+                      widget.badge,
+                      style: TextStyle(color: widget.badgeColor, fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 0.5),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        Expanded(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(widget.title, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: Color(0xFF1D1D1F))),
+                const SizedBox(height: 8),
+                Text(widget.subtitle, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 14, color: Colors.grey.shade700, height: 1.4)),
+                const Spacer(),
+                ...widget.features.map((f) => Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.check_circle_rounded, color: AppTheme.normalGreen, size: 16),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(f, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: Colors.black87)),
+                      ),
+                    ],
+                  ),
+                )),
+                const Spacer(),
+                SizedBox(
+                  width: double.infinity,
+                  height: 52,
+                  child: ElevatedButton(
+                    onPressed: widget.onTap,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _isHovered || widget.isSelected ? AppTheme.primary : const Color(0xFFF2F2F7),
+                      foregroundColor: _isHovered || widget.isSelected ? Colors.white : AppTheme.primary,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    child: const Text("Louer maintenant", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
   }
 }

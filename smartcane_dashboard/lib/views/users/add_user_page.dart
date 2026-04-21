@@ -23,9 +23,8 @@ class _AddUserPageState extends State<AddUserPage> {
   final _cinController = TextEditingController();
   final _phoneMalvoyantController = TextEditingController();
   final _phoneFamilleController = TextEditingController();
-  int? _birthDay;
-  int? _birthMonth;
-  int? _birthYear;
+  final _birthDateController = TextEditingController();
+  DateTime? _selectedBirthDate;
   int? _calculatedAge;
 
   // --- Billing & Commerce ---
@@ -72,15 +71,39 @@ class _AddUserPageState extends State<AddUserPage> {
     _amountController.text = _totalPrice.toString();
   }
 
-  final List<int> _days = List.generate(31, (index) => index + 1);
-  final List<int> _months = List.generate(12, (index) => index + 1);
-  final List<int> _years = List.generate(100, (index) => DateTime.now().year - index);
+  Future<void> _selectBirthDate(BuildContext context) async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedBirthDate ?? DateTime(2000),
+      firstDate: DateTime(1900),
+      lastDate: DateTime.now(),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: const ColorScheme.light(
+              primary: AppTheme.primary,
+              onPrimary: Colors.white,
+              onSurface: Colors.black87,
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+    if (picked != null && picked != _selectedBirthDate) {
+      setState(() {
+        _selectedBirthDate = picked;
+        _birthDateController.text = "${picked.day}/${picked.month}/${picked.year}";
+        _updateAge();
+      });
+    }
+  }
 
   void _updateAge() {
-    if (_birthDay == null || _birthMonth == null || _birthYear == null) return;
+    if (_selectedBirthDate == null) return;
     final now = DateTime.now();
-    int age = now.year - _birthYear!;
-    if (now.month < _birthMonth! || (now.month == _birthMonth! && now.day < _birthDay!)) age--;
+    int age = now.year - _selectedBirthDate!.year;
+    if (now.month < _selectedBirthDate!.month || (now.month == _selectedBirthDate!.month && now.day < _selectedBirthDate!.day)) age--;
     setState(() => _calculatedAge = age);
   }
 
@@ -151,9 +174,7 @@ class _AddUserPageState extends State<AddUserPage> {
       "email": _emailController.text.trim(),
       "numero_de_telephone": _phoneMalvoyantController.text.trim(),
       "contact_familial": _phoneFamilleController.text.trim(),
-      "birth_date": (_birthDay != null && _birthMonth != null && _birthYear != null)
-          ? "$_birthDay/$_birthMonth/$_birthYear"
-          : "N/A",
+      "birth_date": _birthDateController.text.isNotEmpty ? _birthDateController.text : "N/A",
       "adresse": "${_streetController.text.trim()}, ${_cityController.text.trim()} ${_postalCodeController.text.trim()}".trim(),
       "payment_info": {
         "method": _paymentMethod,
@@ -580,12 +601,17 @@ class _AddUserPageState extends State<AddUserPage> {
                           ),
                           const SizedBox(height: 20),
                           Row(
+                            crossAxisAlignment: CrossAxisAlignment.end,
                             children: [
-                              Expanded(flex: 3, child: _dropdown("Jour de naissance", _birthDay, _days, (v) { setState(() => _birthDay = v); _updateAge(); })),
-                              const SizedBox(width: 8),
-                              Expanded(flex: 3, child: _dropdown("Mois", _birthMonth, _months, (v) { setState(() => _birthMonth = v); _updateAge(); })),
-                              const SizedBox(width: 8),
-                              Expanded(flex: 4, child: _dropdown("Année", _birthYear, _years, (v) { setState(() => _birthYear = v); _updateAge(); })),
+                              Expanded(
+                                flex: 7,
+                                child: GestureDetector(
+                                  onTap: () => _selectBirthDate(context),
+                                  child: AbsorbPointer(
+                                    child: _field("Date de naissance", _birthDateController, Icons.calendar_today),
+                                  ),
+                                ),
+                              ),
                               const SizedBox(width: 16),
                               _ageBadge(),
                             ],

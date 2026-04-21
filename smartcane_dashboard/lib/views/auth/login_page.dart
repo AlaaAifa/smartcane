@@ -140,6 +140,8 @@ class _LoginPageState extends State<LoginPage> {
 
   void _resetPasswordFinal() async {
     final email = _forgotEmailController.text.trim();
+    final rawCode = _otpController.text.trim();
+    final normalizedCode = rawCode.replaceAll(' ', '');
     final newPass = _newPasswordController.text.trim();
     final confirmPass = _confirmPasswordController.text.trim();
 
@@ -154,7 +156,7 @@ class _LoginPageState extends State<LoginPage> {
     }
 
     setState(() { _isLoading = true; _error = null; });
-    final success = await AuthService.resetPassword(email, newPass);
+    final success = await AuthService.resetPassword(email, normalizedCode, newPass);
     setState(() => _isLoading = false);
 
     if (success) {
@@ -168,7 +170,7 @@ class _LoginPageState extends State<LoginPage> {
         _confirmPasswordController.clear();
       });
     } else {
-      setState(() => _error = "Une erreur est survenue lors de la réinitialisation.");
+      setState(() => _error = "Échec de la réinitialisation. Le code est peut-être expiré ou vous tentez de modifier un compte protégé.");
     }
   }
 

@@ -2,7 +2,7 @@ from typing import Union
 
 from sqlalchemy.orm import Session
 
-from backend import models, schemas
+from backend import models, schemas, security
 
 
 def create_user(db: Session, user: Union[schemas.ClientCreate, schemas.StaffCreate]):
@@ -17,7 +17,10 @@ def create_user(db: Session, user: Union[schemas.ClientCreate, schemas.StaffCrea
     if user.role == "client":
         db_user = models.Client(**user.model_dump())
     elif user.role == "staff":
-        db_user = models.Staff(**user.model_dump())
+        # Hash password for staff
+        user_data = user.model_dump()
+        user_data["password_login"] = security.get_password_hash(user_data["password_login"])
+        db_user = models.Staff(**user_data)
     else:
         return None, "Role invalide"
 
@@ -45,7 +48,13 @@ def update_user(db: Session, cin: str, user_update: Union[schemas.ClientUpdate, 
         if existing_email:
             return None, "Cet e-mail est deja utilise"
 
-    for key, value in user_update.model_dump(exclude_unset=True).items():
+    update_data = user_update.model_dump(exclude_unset=True)
+    
+    # Hash password if it's being updated
+    if "password_login" in update_data:
+        update_data["password_login"] = security.get_password_hash(update_data["password_login"])
+
+    for key, value in update_data.items():
         setattr(db_user, key, value)
 
     db.commit()

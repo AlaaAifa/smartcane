@@ -185,3 +185,15 @@ class Alert(AlertBase):
 
     class Config:
         from_attributes = True
+
+class PasswordResetRequest(BaseModel):
+    email: EmailStr
+
+class OTPVerificationRequest(BaseModel):
+    email: EmailStr
+    code: str
+
+class PasswordResetConfirm(BaseModel):
+    email: EmailStr
+    code: str
+    new_password: str

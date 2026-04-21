@@ -7,12 +7,12 @@ from backend.controllers.auth_controller import router as auth_router
 from backend.controllers.cannes_controller import router as cannes_router
 from backend.controllers.locations_controller import router as locations_router
 from backend.controllers.utilisateurs_controller import router as utilisateurs_router
-from backend.database import engine
-from backend.models import Abonnement, Alert, Canne, Location, Utilisateur
+from backend.database import engine, Base
+from backend.models import Abonnement, Alert, Canne, Location, Utilisateur, ResetCode
 
 
 try:
-    Utilisateur.metadata.create_all(bind=engine)
+    Base.metadata.create_all(bind=engine)
     print("SUCCES: Tables creees ou deja existantes dans MySQL")
 except Exception as exc:
     print(f"ERREUR lors de la creation des tables: {exc}")

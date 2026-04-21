@@ -29,14 +29,45 @@ class AuthService {
   }
 
   static Future<bool> requestPasswordReset(String email) async {
-    return false;
+    try {
+      final res = await http.post(
+        Uri.parse("${BaseService.baseUrl}/auth/request-reset"),
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({"email": email}),
+      );
+      return res.statusCode == 200;
+    } catch (e) {
+      return false;
+    }
   }
 
   static Future<bool> verifyOtp(String email, String code) async {
-    return false;
+    try {
+      final res = await http.post(
+        Uri.parse("${BaseService.baseUrl}/auth/verify-otp"),
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({"email": email, "code": code}),
+      );
+      return res.statusCode == 200;
+    } catch (e) {
+      return false;
+    }
   }
 
-  static Future<bool> resetPassword(String email, String newPassword) async {
-    return false;
+  static Future<bool> resetPassword(String email, String code, String newPassword) async {
+    try {
+      final res = await http.post(
+        Uri.parse("${BaseService.baseUrl}/auth/reset-password"),
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({
+          "email": email,
+          "code": code,
+          "new_password": newPassword,
+        }),
+      );
+      return res.statusCode == 200;
+    } catch (e) {
+      return false;
+    }
   }
 }
