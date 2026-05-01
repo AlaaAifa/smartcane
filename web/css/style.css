@@ -1,0 +1,102 @@
+/* Styles globaux Ocean Luxury */
+html {
+    scroll-behavior: smooth;
+}
+
+body {
+    font-family: 'Outfit', sans-serif;
+    background-color: #081224;
+    color: #F8FAFC;
+}
+
+/* Classes utilitaires personnalisées */
+.btn-primary {
+    background-color: #F8FAFC;
+    color: #081224;
+    padding: 1rem 2.5rem;
+    border-radius: 9999px;
+    font-weight: 700;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    display: inline-block;
+    box-shadow: 0 0 40px rgba(255, 255, 255, 0.05);
+}
+
+.btn-primary:hover {
+    transform: scale(1.05);
+    background-color: #FFFFFF;
+    box-shadow: 0 0 50px rgba(255, 255, 255, 0.15);
+}
+
+.btn-outline {
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: #F8FAFC;
+    padding: 1rem 2.5rem;
+    border-radius: 9999px;
+    font-weight: 700;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    display: inline-block;
+    backdrop-filter: blur(12px);
+}
+
+.btn-outline:hover {
+    background-color: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.4);
+    transform: scale(1.05);
+}
+
+.section-title {
+    font-size: 3rem;
+    line-height: 1.1;
+    font-weight: 800;
+    color: #FFFFFF;
+    margin-bottom: 2rem;
+    letter-spacing: -0.02em;
+}
+
+@media (min-width: 768px) {
+    .section-title {
+        font-size: 4.5rem;
+    }
+}
+
+.glass-card {
+    background-color: rgba(15, 31, 61, 0.4);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 2rem;
+    padding: 3rem;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+    transition: all 0.4s ease;
+}
+
+.glass-card:hover {
+    border-color: rgba(255, 255, 255, 0.1);
+    background-color: rgba(15, 31, 61, 0.6);
+    transform: translateY(-10px);
+}
+
+/* Sections Backgrounds for Luxury Mode */
+#services, #contact {
+    background-color: #081224 !important;
+}
+
+section {
+    position: relative;
+    z-index: 1;
+}
+
+/* Animations */
+.animate-fade-up {
+    animation: fadeUp 1.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes fadeUp {
+    from {
+        opacity: 0;
+        transform: translateY(40px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
