@@ -384,7 +384,7 @@ class _AlertsPageState extends State<AlertsPage> {
                     _detail("Email", user?["email"]?.toString() ?? "N/A"),
                     _detail("Telephone", user?["numero_de_telephone"]?.toString() ?? "N/A"),
                     _detail("Contact familial", user?["contact_familial"]?.toString() ?? "N/A"),
-                    _detail("Etat de sante", user?["etat_de_sante"]?.toString() ?? "N/A"),
+                    _detail("Etat de sante", AppTheme.formatHealthInfo(user?["etat_de_sante"]?.toString())),
                     _detail("Coordonnees", "${alert['latitude']}, ${alert['longitude']}"),
                     const SizedBox(height: 24),
                     Row(

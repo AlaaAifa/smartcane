@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../theme.dart';
 import '../../services/services.dart';
 
@@ -39,8 +40,8 @@ class _StaffPageState extends State<StaffPage> {
       return const Center(child: CircularProgressIndicator());
     }
 
-    final morningStaff = staffMembers.where((s) => s["shift"] == "matin" || s["shift"] == null).toList();
-    final eveningStaff = staffMembers.where((s) => s["shift"] == "soir").toList();
+    final morningStaff = staffMembers.where((s) => s["shift"] == "Journée" || s["shift"] == "matin" || s["shift"] == null).toList();
+    final eveningStaff = staffMembers.where((s) => s["shift"] == "Nuit" || s["shift"] == "soir").toList();
 
     return Padding(
       padding: const EdgeInsets.all(32),
@@ -74,7 +75,7 @@ class _StaffPageState extends State<StaffPage> {
                 Expanded(
                   child: Column(
                     children: [
-                      _buildShiftHeader("SHIFT MATIN", Icons.wb_sunny_rounded, Colors.orange),
+                      _buildShiftHeader("SHIFT Journée", Icons.wb_sunny_rounded, Colors.orange),
                       const SizedBox(height: 16),
                       Expanded(
                         child: ListView.builder(
@@ -99,7 +100,7 @@ class _StaffPageState extends State<StaffPage> {
                 Expanded(
                   child: Column(
                     children: [
-                      _buildShiftHeader("SHIFT SOIR", Icons.nightlight_round, Colors.indigo),
+                      _buildShiftHeader("SHIFT Nuit", Icons.nightlight_round, Colors.indigo),
                       const SizedBox(height: 16),
                       Expanded(
                         child: ListView.builder(
@@ -210,10 +211,15 @@ class _StaffPageState extends State<StaffPage> {
     final name = TextEditingController(text: staff['nom']?.toString() ?? "");
     final email = TextEditingController(text: staff['email']?.toString() ?? "");
     final age = TextEditingController(text: staff['age']?.toString() ?? "");
-    final phone = TextEditingController(text: staff['numero_de_telephone']?.toString() ?? "");
+    final phone = TextEditingController(text: _normalizePhoneDigits(staff['numero_de_telephone']?.toString() ?? ""));
     final address = TextEditingController(text: staff['adresse']?.toString() ?? "");
     final password = TextEditingController();
-    String shift = staff['shift']?.toString() ?? "matin";
+    
+    String rawShift = staff['shift']?.toString() ?? "Journée";
+    String shift = "Journée";
+    if (rawShift == "Nuit" || rawShift == "soir") {
+      shift = "Nuit";
+    }
 
     showDialog(
       context: context,
@@ -227,7 +233,7 @@ class _StaffPageState extends State<StaffPage> {
                 _buildField("Nom", name, Icons.person),
                 _buildField("Email", email, Icons.email),
                 _buildField("Âge", age, Icons.cake, isNumber: true),
-                _buildField("Téléphone", phone, Icons.phone),
+                _buildField("Téléphone", phone, Icons.phone, isPhone: true),
                 _buildField("Adresse", address, Icons.home),
                 _buildField("Nouveau mot de passe", password, Icons.lock, obscure: true),
                 const SizedBox(height: 12),
@@ -235,10 +241,10 @@ class _StaffPageState extends State<StaffPage> {
                   value: shift,
                   decoration: const InputDecoration(labelText: "Shift", prefixIcon: Icon(Icons.access_time)),
                   items: const [
-                    DropdownMenuItem(value: "matin", child: Text("Matin")),
-                    DropdownMenuItem(value: "soir", child: Text("Soir")),
+                    DropdownMenuItem(value: "Journée", child: Text("Journée")),
+                    DropdownMenuItem(value: "Nuit", child: Text("Nuit")),
                   ],
-                  onChanged: (val) => setDialogState(() => shift = val ?? "matin"),
+                  onChanged: (val) => setDialogState(() => shift = val ?? "Journée"),
                 ),
               ],
             ),
@@ -252,17 +258,22 @@ class _StaffPageState extends State<StaffPage> {
                   "name": name.text,
                   "email": email.text,
                   "age": age.text,
-                  "phone": phone.text,
+                  "phone": _formatPhoneForBackend(phone.text),
                   "address": address.text,
                   "password": password.text,
                   "shift": shift,
                 };
-                if (await StaffService.updateStaff(updated)) {
-                  if (!mounted) {
-                    return;
-                  }
+                final res = await StaffService.updateStaff(updated);
+                if (!mounted) return;
+                
+                if (res["success"] == true) {
                   Navigator.pop(ctx);
                   _loadData();
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                    content: Text(res["error"] ?? "Erreur lors de la mise à jour"),
+                    backgroundColor: Colors.red,
+                  ));
                 }
               },
               child: const Text("Mettre à jour"),
@@ -281,7 +292,7 @@ class _StaffPageState extends State<StaffPage> {
     final password = TextEditingController();
     final phone = TextEditingController();
     final address = TextEditingController();
-    String shift = "matin";
+    String shift = "Journée";
 
     showDialog(
       context: context,
@@ -297,17 +308,17 @@ class _StaffPageState extends State<StaffPage> {
                 _buildField("Email", email, Icons.email),
                 _buildField("Âge", age, Icons.cake, isNumber: true),
                 _buildField("Mot de passe", password, Icons.lock, obscure: true),
-                _buildField("Téléphone", phone, Icons.phone),
+                _buildField("Téléphone", phone, Icons.phone, isPhone: true),
                 _buildField("Adresse", address, Icons.home),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
                   value: shift,
                   decoration: const InputDecoration(labelText: "Shift", prefixIcon: Icon(Icons.access_time)),
                   items: const [
-                    DropdownMenuItem(value: "matin", child: Text("Matin")),
-                    DropdownMenuItem(value: "soir", child: Text("Soir")),
+                    DropdownMenuItem(value: "Journée", child: Text("Journée")),
+                    DropdownMenuItem(value: "Nuit", child: Text("Nuit")),
                   ],
-                  onChanged: (val) => setDialogState(() => shift = val ?? "matin"),
+                  onChanged: (val) => setDialogState(() => shift = val ?? "Journée"),
                 ),
               ],
             ),
@@ -316,22 +327,27 @@ class _StaffPageState extends State<StaffPage> {
             TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("Annuler")),
             ElevatedButton(
               onPressed: () async {
-                final staff = {
+                final newStaff = {
                   "staff_id": cin.text,
                   "name": name.text,
                   "email": email.text,
                   "age": age.text,
                   "password": password.text,
-                  "phone": phone.text,
+                  "phone": _formatPhoneForBackend(phone.text),
                   "address": address.text,
                   "shift": shift,
                 };
-                if (await StaffService.addStaff(staff)) {
-                  if (!mounted) {
-                    return;
-                  }
+                final res = await StaffService.addStaff(newStaff);
+                if (!mounted) return;
+                
+                if (res["success"] == true) {
                   Navigator.pop(ctx);
                   _loadData();
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                    content: Text(res["error"] ?? "Erreur lors de l'ajout"),
+                    backgroundColor: Colors.red,
+                  ));
                 }
               },
               child: const Text("Enregistrer"),
@@ -342,16 +358,65 @@ class _StaffPageState extends State<StaffPage> {
     );
   }
 
-  Widget _buildField(String label, TextEditingController controller, IconData icon, {bool obscure = false, bool isNumber = false}) {
+  // Normalise an existing phone value → returns only the 8-digit part
+  static String _normalizePhoneDigits(String raw) {
+    String cleaned = raw.trim();
+    if (cleaned.startsWith('+216')) cleaned = cleaned.substring(4);
+    else if (cleaned.startsWith('00216')) cleaned = cleaned.substring(5);
+    else if (cleaned.startsWith('216') && cleaned.length > 3) cleaned = cleaned.substring(3);
+    cleaned = cleaned.replaceAll(RegExp(r'[^0-9]'), '');
+    if (cleaned.length > 8) cleaned = cleaned.substring(0, 8);
+    return cleaned;
+  }
+
+  static String _formatPhoneForBackend(String eightDigits) {
+    final digits = eightDigits.replaceAll(RegExp(r'[^0-9]'), '');
+    if (digits.isEmpty) return '';
+    return '+216$digits';
+  }
+
+  Widget _buildField(String label, TextEditingController controller, IconData icon, {bool obscure = false, bool isNumber = false, bool isPhone = false}) {
+    if (isPhone && controller.text.isNotEmpty) {
+      final normalized = _normalizePhoneDigits(controller.text);
+      if (controller.text != normalized) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (controller.text != normalized) controller.text = normalized;
+        });
+      }
+    }
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: TextField(
         controller: controller,
         obscureText: obscure,
-        keyboardType: isNumber ? TextInputType.number : TextInputType.text,
+        keyboardType: isPhone || isNumber ? TextInputType.number : TextInputType.text,
+        inputFormatters: isPhone
+            ? [
+                FilteringTextInputFormatter.digitsOnly,
+                LengthLimitingTextInputFormatter(8),
+              ]
+            : null,
         decoration: InputDecoration(
           labelText: label,
-          prefixIcon: Icon(icon, size: 20),
+          prefixIcon: isPhone ? null : Icon(icon, size: 20),
+          prefix: isPhone
+              ? Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(icon, size: 20, color: Colors.grey),
+                    const SizedBox(width: 6),
+                    Text(
+                      '+216 ',
+                      style: TextStyle(
+                        color: Colors.grey.shade700,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                      ),
+                    ),
+                  ],
+                )
+              : null,
+          hintText: isPhone ? '12 345 678' : null,
         ),
       ),
     );

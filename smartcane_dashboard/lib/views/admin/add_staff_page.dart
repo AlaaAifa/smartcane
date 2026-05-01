@@ -30,10 +30,10 @@ class _AddStaffPageState extends State<AddStaffPage> {
       "shift": _shift,
     };
 
-    final success = await StaffService.addStaff(staff);
+    final result = await StaffService.addStaff(staff);
     setState(() => _isLoading = false);
 
-    if (success) {
+    if (result["success"] == true) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Compte créé avec succès !"), backgroundColor: Colors.green),
       );

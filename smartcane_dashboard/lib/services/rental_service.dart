@@ -38,43 +38,51 @@ class RentalService {
         formattedAddress = data["adresse"]?.toString() ?? "";
       }
 
-      // 2. Create User
-      final userRes = await http.post(
-        Uri.parse("${BaseService.baseUrl}/users"),
-        headers: BaseService.headers,
-        body: jsonEncode({
-          "cin": data["cin"], 
+      // 2. Check if User Exists and Update or Create
+      final existingUser = await UserService.getUserByCin(data["cin"]);
+
+      if (existingUser != null) {
+        // Update existing user
+        final resUpdate = await UserService.updateUser(data["cin"], {
           "nom": data["full_name"],
           "age": int.tryParse(data["age"]?.toString() ?? "0") ?? 0,
           "adresse": formattedAddress,
-          "email": data["email"]?.toString().isNotEmpty == true ? data["email"] : "${data['cin']}@smartcane.com", 
+          "email": data["email"]?.toString().isNotEmpty == true ? data["email"] : "${data['cin']}@smartcane.com",
           "numero_de_telephone": data["phone"],
           "contact_familial": data["emergency_phone"],
           "etat_de_sante": data["health_notes"],
           "sim_de_la_canne": data["sim_number"],
-          "role": "client",
-        }),
-      );
-
-      if (userRes.statusCode != 201 && userRes.statusCode != 400) {
-        print("User creation failed: ${userRes.body}");
-        return false;
-      }
-
-      if (userRes.statusCode == 400) {
-        final resUpdate = await UserService.updateUser(data["cin"], {
-          "nom": data["full_name"],
-          "adresse": formattedAddress,
-          "numero_de_telephone": data["phone"],
-          "sim_de_la_canne": data["sim_number"],
-          "etat_de_sante": data["health_notes"],
         });
         if (!resUpdate["success"]) {
            print("Rental User Update failed: ${resUpdate["error"]}");
+           return false;
+        }
+      } else {
+        // Create new user
+        final userRes = await http.post(
+          Uri.parse("${BaseService.baseUrl}/users"),
+          headers: BaseService.headers,
+          body: jsonEncode({
+            "cin": data["cin"], 
+            "nom": data["full_name"],
+            "age": int.tryParse(data["age"]?.toString() ?? "0") ?? 0,
+            "adresse": formattedAddress,
+            "email": data["email"]?.toString().isNotEmpty == true ? data["email"] : "${data['cin']}@smartcane.com", 
+            "numero_de_telephone": data["phone"],
+            "contact_familial": data["emergency_phone"],
+            "etat_de_sante": data["health_notes"],
+            "sim_de_la_canne": data["sim_number"],
+            "role": "client",
+          }),
+        );
+
+        if (userRes.statusCode != 201) {
+          print("User creation failed: ${userRes.body}");
+          return false;
         }
       }
 
-      // 2. Create Location (Rental)
+      // 3. Create Location (Rental)
       final locRes = await http.post(
         Uri.parse("${BaseService.baseUrl}/locations"),
         headers: BaseService.headers,

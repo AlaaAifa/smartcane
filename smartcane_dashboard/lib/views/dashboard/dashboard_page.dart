@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'dart:convert';
 import '../theme.dart';
 import '../../services/services.dart';
 
@@ -88,7 +90,25 @@ class _DashboardPageState extends State<DashboardPage> {
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text(_displayName(user), style: const TextStyle(fontWeight: FontWeight.w900)),
+        title: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text("Informations", style: TextStyle(fontSize: 14, color: Colors.grey, fontWeight: FontWeight.normal)),
+                Text(_displayName(user), style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 22)),
+              ],
+            ),
+            IconButton(
+              icon: const Icon(Icons.edit, color: AppTheme.primary),
+              onPressed: () {
+                Navigator.pop(ctx);
+                _editUser(user);
+              },
+            ),
+          ],
+        ),
         content: SizedBox(
           width: 560,
           child: Column(
@@ -101,7 +121,7 @@ class _DashboardPageState extends State<DashboardPage> {
               _detailRow("Contact familial", user["contact_familial"]?.toString() ?? "N/A"),
               _detailRow("Age", user["age"]?.toString() ?? "N/A"),
               _detailRow("Adresse", user["adresse"]?.toString() ?? "N/A"),
-              _detailRow("Etat de sante", user["etat_de_sante"]?.toString() ?? "N/A"),
+              _detailRow("Etat de sante", AppTheme.formatHealthInfo(user["etat_de_sante"]?.toString())),
               _detailRow("SIM associee", user["sim_de_la_canne"]?.toString() ?? "N/A"),
               _detailRow("Statut", isRenter ? "Location" : "Abonnement/Vente"),
               if (userRentals.isNotEmpty)
@@ -115,6 +135,204 @@ class _DashboardPageState extends State<DashboardPage> {
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("Fermer")),
         ],
+      ),
+    );
+  }
+
+  void _editUser(Map<String, dynamic> user) {
+    final cin = user["cin"]?.toString() ?? "";
+    final nomController = TextEditingController(text: user["nom"]?.toString() ?? "");
+    final emailController = TextEditingController(text: user["email"]?.toString() ?? "");
+    final phoneController = TextEditingController(text: _normalizePhoneDigits(user["numero_de_telephone"]?.toString() ?? ""));
+    final contactController = TextEditingController(text: _normalizePhoneDigits(user["contact_familial"]?.toString() ?? ""));
+    final ageController = TextEditingController(text: user["age"]?.toString() ?? "");
+    final adresseController = TextEditingController(text: user["adresse"]?.toString() ?? "");
+    final simController = TextEditingController(text: _normalizePhoneDigits(user["sim_de_la_canne"]?.toString() ?? ""));
+
+    // Parse medical data
+    Map<String, dynamic> medicalData = {};
+    try {
+      String rawHealth = user["etat_de_sante"]?.toString() ?? "";
+      if (rawHealth.startsWith('{')) {
+        medicalData = jsonDecode(rawHealth);
+      } else {
+        medicalData = {"observations": rawHealth};
+      }
+    } catch (e) {
+      medicalData = {"observations": user["etat_de_sante"]?.toString() ?? ""};
+    }
+
+    final List<String> availablePathologies = [
+      "Diabète", "Hypertension", "Maladie cardiaque", "Épilepsie", 
+      "Troubles de l’équilibre / Vertiges", "Difficulté de mobilité", 
+      "Baisse auditive", "Allergies médicamenteuses", 
+      "Aucune pathologie connue", "Autre"
+    ];
+
+    Map<String, bool> pathologies = {
+      for (var p in availablePathologies) p: (medicalData["pathologies"] as List?)?.contains(p) ?? false
+    };
+    
+    final allergyCtrl = TextEditingController(text: medicalData["allergie_detail"]?.toString() ?? "");
+    final otherCtrl = TextEditingController(text: medicalData["autre_detail"]?.toString() ?? "");
+    final obsCtrl = TextEditingController(text: medicalData["observations"]?.toString() ?? "");
+    String bloodGroup = medicalData["groupe_sanguin"]?.toString() ?? "Inconnu";
+    final List<String> bloodGroups = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-", "Inconnu"];
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: Text("Modifier ${_displayName(user)}", style: const TextStyle(fontWeight: FontWeight.w900)),
+          content: SizedBox(
+            width: 600,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text("Informations Générales", style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.primary)),
+                  const SizedBox(height: 16),
+                  _buildEditField("Nom", nomController),
+                  _buildEditField("Email", emailController),
+                  _buildEditField("Telephone", phoneController, isPhone: true),
+                  _buildEditField("Contact familial", contactController, isPhone: true),
+                  Row(
+                    children: [
+                      Expanded(child: _buildEditField("Age", ageController, isNumber: true)),
+                      const SizedBox(width: 16),
+                      Expanded(child: _buildEditField("SIM associee", simController, isPhone: true)),
+                    ],
+                  ),
+                  _buildEditField("Adresse", adresseController),
+                  
+                  const Divider(height: 32),
+                  const Text("Informations Médicales", style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.primary)),
+                  const SizedBox(height: 16),
+                  
+                  const Text("Pathologies :", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.grey)),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 4,
+                    children: availablePathologies.map((p) => FilterChip(
+                      label: Text(p, style: const TextStyle(fontSize: 12)),
+                      selected: pathologies[p]!,
+                      onSelected: (val) => setDialogState(() {
+                        if (p == "Aucune pathologie connue" && val) {
+                          pathologies.updateAll((key, value) => false);
+                        } else if (val) {
+                          pathologies["Aucune pathologie connue"] = false;
+                        }
+                        pathologies[p] = val;
+                      }),
+                    )).toList(),
+                  ),
+                  if (pathologies["Allergies médicamenteuses"]!) ...[
+                    const SizedBox(height: 12),
+                    _buildEditField("Préciser le(s) médicament(s)", allergyCtrl),
+                  ],
+                  if (pathologies["Autre"]!) ...[
+                    const SizedBox(height: 12),
+                    _buildEditField("Préciser l'autre pathologie", otherCtrl),
+                  ],
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      const Text("Groupe sanguin : ", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
+                      const SizedBox(width: 12),
+                      DropdownButton<String>(
+                        value: bloodGroup,
+                        items: bloodGroups.map((g) => DropdownMenuItem(value: g, child: Text(g))).toList(),
+                        onChanged: (val) => setDialogState(() => bloodGroup = val!),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  _buildEditField("Observations complémentaires", obsCtrl, isMultiline: true),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("Annuler")),
+            ElevatedButton(
+              onPressed: () async {
+                final newMedicalJson = jsonEncode({
+                  "pathologies": pathologies.entries.where((e) => e.value).map((e) => e.key).toList(),
+                  "allergie_detail": allergyCtrl.text.trim(),
+                  "autre_detail": otherCtrl.text.trim(),
+                  "groupe_sanguin": bloodGroup,
+                  "observations": obsCtrl.text.trim(),
+                });
+
+                final updateData = {
+                  "nom": nomController.text.trim(),
+                  "email": emailController.text.trim(),
+                  "numero_de_telephone": _formatPhoneForBackend(phoneController.text.trim()),
+                  "contact_familial": _formatPhoneForBackend(contactController.text.trim()),
+                  "age": int.tryParse(ageController.text) ?? user["age"],
+                  "adresse": adresseController.text.trim(),
+                  "sim_de_la_canne": _formatPhoneForBackend(simController.text.trim()),
+                  "etat_de_sante": newMedicalJson,
+                };
+
+                final res = await UserService.updateUser(cin, updateData);
+                if (res["success"]) {
+                  if (mounted) {
+                    Navigator.pop(ctx);
+                    _loadData();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text("Utilisateur mis à jour avec succès"), backgroundColor: AppTheme.normalGreen),
+                    );
+                  }
+                } else {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text("Erreur: ${res["error"]}"), backgroundColor: AppTheme.sosRed),
+                    );
+                  }
+                }
+              },
+              child: const Text("Sauvegarder", style: TextStyle(color: Colors.white)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  static String _normalizePhoneDigits(String raw) {
+    String cleaned = raw.trim();
+    if (cleaned.startsWith('+216')) cleaned = cleaned.substring(4);
+    else if (cleaned.startsWith('00216')) cleaned = cleaned.substring(5);
+    else if (cleaned.startsWith('216') && cleaned.length > 3) cleaned = cleaned.substring(3);
+    cleaned = cleaned.replaceAll(RegExp(r'[^0-9]'), '');
+    if (cleaned.length > 8) cleaned = cleaned.substring(0, 8);
+    return cleaned;
+  }
+
+  static String _formatPhoneForBackend(String eightDigits) {
+    final digits = eightDigits.replaceAll(RegExp(r'[^0-9]'), '');
+    if (digits.isEmpty) return '';
+    return '+216$digits';
+  }
+
+  Widget _buildEditField(String label, TextEditingController controller, {bool isNumber = false, bool isMultiline = false, bool isPhone = false}) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: TextField(
+        controller: controller,
+        maxLines: isMultiline ? 3 : 1,
+        keyboardType: (isNumber || isPhone) ? TextInputType.number : (isMultiline ? TextInputType.multiline : TextInputType.text),
+        inputFormatters: isPhone ? [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(8)] : null,
+        decoration: InputDecoration(
+          labelText: label,
+          isDense: true,
+          border: const OutlineInputBorder(),
+          prefix: isPhone ? const Text('+216 ') : null,
+        ),
       ),
     );
   }

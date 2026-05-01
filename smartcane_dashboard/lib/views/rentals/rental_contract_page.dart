@@ -121,6 +121,7 @@ class RentalContractPage extends StatelessWidget {
                     Expanded(
                       child: _infoBlock([
                         _contractRow("Adresse", _formatAddress(rentalData['address'])),
+                        _contractRow("Santé", AppTheme.formatHealthInfo(rentalData['health_notes'])),
                         _contractRow("Contact d'Urgence", "${rentalData['emergency_name']} (${rentalData['emergency_relation']})"),
                         _contractRow("Tél. Urgence", rentalData['emergency_phone'] ?? 'N/A'),
                       ]),

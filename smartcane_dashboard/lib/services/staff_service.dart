@@ -16,7 +16,7 @@ class StaffService {
     return [];
   }
 
-  static Future<bool> addStaff(Map<String, dynamic> staff) async {
+  static Future<Map<String, dynamic>> addStaff(Map<String, dynamic> staff) async {
     try {
       final res = await http.post(Uri.parse("${BaseService.baseUrl}/users"), headers: BaseService.headers, body: jsonEncode({
         "cin": staff["staff_id"],
@@ -27,16 +27,18 @@ class StaffService {
         "adresse": staff["address"],
         "password_login": staff["password"],
         "role": "staff",
-        "shift": staff["shift"] ?? "matin",
+        "shift": staff["shift"] ?? "Journée",
       }));
-      return res.statusCode == 201;
+      if (res.statusCode == 201) return {"success": true};
+      final body = jsonDecode(res.body);
+      return {"success": false, "error": body['detail'] ?? "Erreur inconnue"};
     } catch (e) { 
       print("Add staff error: $e"); 
+      return {"success": false, "error": "Erreur réseau: $e"};
     }
-    return false;
   }
 
-  static Future<bool> updateStaff(Map<String, dynamic> staff) async {
+  static Future<Map<String, dynamic>> updateStaff(Map<String, dynamic> staff) async {
     try {
       final res = await http.put(
         Uri.parse("${BaseService.baseUrl}/users/${staff['staff_id']}"),
@@ -52,10 +54,12 @@ class StaffService {
           if (staff["shift"] != null) "shift": staff["shift"],
         }),
       );
-      return res.statusCode == 200;
+      if (res.statusCode == 200) return {"success": true};
+      final body = jsonDecode(res.body);
+      return {"success": false, "error": body['detail'] ?? "Erreur inconnue"};
     } catch (e) { 
       print("Update staff error: $e"); 
+      return {"success": false, "error": "Erreur réseau: $e"};
     }
-    return false;
   }
 }

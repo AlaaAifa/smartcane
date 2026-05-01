@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'dart:convert';
 import '../../services/services.dart';
 import '../theme.dart';
 import 'sales_contract_page.dart';
@@ -39,6 +41,26 @@ class _AddUserPageState extends State<AddUserPage> {
   // --- Equipment & Subscription (Step 5) ---
   final _simNumberController = TextEditingController();
   final _healthNotesController = TextEditingController();
+  
+  // Structured Medical Info
+  final Map<String, bool> _pathologies = {
+    "Diabète": false,
+    "Hypertension": false,
+    "Maladie cardiaque": false,
+    "Épilepsie": false,
+    "Troubles de l’équilibre / Vertiges": false,
+    "Difficulté de mobilité": false,
+    "Baisse auditive": false,
+    "Allergies médicamenteuses": false,
+    "Aucune pathologie connue": false,
+    "Autre": false,
+  };
+  final _allergyDetailController = TextEditingController();
+  final _otherPathologyController = TextEditingController();
+  String _selectedBloodGroup = "Inconnu";
+  final List<String> _bloodGroups = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-", "Inconnu"];
+  final _medicalObservationsController = TextEditingController();
+
   String _selectedCaneVersion = "Smart Pro v3";
   final Map<String, int> _canePrices = {
     "Smart Lite": 1200,
@@ -142,7 +164,7 @@ class _AddUserPageState extends State<AddUserPage> {
     switch (_currentStep) {
       case 2: return "Étape 1 : Coordonnées du bénéficiaire";
       case 3: return "Étape 2 : Adresse de résidence";
-      case 4: return "Étape 3 : Contact d'urgence";
+      case 4: return "Étape 3 : Urgence et Santé";
       case 5: return "Étape 4 : Équipement et Abonnement";
       case 6: return "Étape 5 : Règlement et Paiement";
       case 7: return "Étape 6 : Récapitulatif et Signature du contrat";
@@ -331,7 +353,7 @@ class _AddUserPageState extends State<AddUserPage> {
         Text("${_canePrices[_selectedCaneVersion]} TND", style: const TextStyle(fontSize: 20, color: AppTheme.primary, fontWeight: FontWeight.bold)),
         const SizedBox(height: 24),
         Text(
-          "Équipement de mobilité avancée conçu pour une autonomie totale des personnes malvoyantes.",
+          "Équipement de mobility avancée conçu pour une autonomie totale des personnes malvoyantes.",
           style: TextStyle(fontSize: 16, color: Colors.grey.shade700, height: 1.6),
         ),
         const SizedBox(height: 32),
@@ -562,7 +584,7 @@ class _AddUserPageState extends State<AddUserPage> {
         _buildTextField(_emailController, "exemple@mail.com", Icons.email_outlined),
         const SizedBox(height: 24),
         _buildFieldLabel("Téléphone principal"),
-        _buildTextField(_phoneController, "01 23 45 67 89", Icons.phone_outlined, isNumber: true),
+        _buildTextField(_phoneController, "12 345 678", Icons.phone_outlined, isPhone: true),
       ],
     );
   }
@@ -607,7 +629,7 @@ class _AddUserPageState extends State<AddUserPage> {
 
   Widget _buildStepEmergencyContact() {
     return _buildStepContainer(
-      title: "III. CONTACT D'URGENCE",
+      title: "III. URGENCE ET INFORMATIONS MÉDICALES",
       icon: Icons.emergency_outlined,
       children: [
         _buildFieldLabel("Nom du contact d'urgence"),
@@ -630,12 +652,99 @@ class _AddUserPageState extends State<AddUserPage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   _buildFieldLabel("Numéro de téléphone"),
-                  _buildTextField(_emergencyPhoneController, "Numéro permanent", Icons.phone_enabled_outlined, isNumber: true),
+                  _buildTextField(_emergencyPhoneController, "12 345 678", Icons.phone_enabled_outlined, isPhone: true),
                 ],
               ),
             ),
           ],
         ),
+        const SizedBox(height: 32),
+        const Divider(),
+        const SizedBox(height: 16),
+        _buildSectionHeader(Icons.health_and_safety_outlined, "SANTÉ DU BÉNÉFICIAIRE"),
+        const SizedBox(height: 24),
+        
+        // Pathologies (Grid-like layout)
+        _buildFieldLabel("Antécédents / Pathologies (Sélection multiple)"),
+        Wrap(
+          spacing: 12,
+          runSpacing: 8,
+          children: _pathologies.keys.map((pathology) {
+            return FilterChip(
+              label: Text(pathology),
+              selected: _pathologies[pathology]!,
+              onSelected: (selected) {
+                setState(() {
+                  if (pathology == "Aucune pathologie connue" && selected) {
+                    // Reset all others if "None" is selected
+                    _pathologies.updateAll((key, value) => false);
+                  } else if (selected) {
+                    _pathologies["Aucune pathologie connue"] = false;
+                  }
+                  _pathologies[pathology] = selected;
+                });
+              },
+              selectedColor: AppTheme.primary.withOpacity(0.2),
+              checkmarkColor: AppTheme.primary,
+              labelStyle: TextStyle(
+                color: _pathologies[pathology]! ? AppTheme.primary : Colors.black87,
+                fontWeight: _pathologies[pathology]! ? FontWeight.bold : FontWeight.normal,
+              ),
+            );
+          }).toList(),
+        ),
+        
+        const SizedBox(height: 16),
+        if (_pathologies["Allergies médicamenteuses"]!) ...[
+          _buildFieldLabel("Préciser le(s) médicament(s)"),
+          _buildTextField(_allergyDetailController, "Quelles allergies ?", Icons.warning_amber_outlined),
+          const SizedBox(height: 16),
+        ],
+        
+        if (_pathologies["Autre"]!) ...[
+          _buildFieldLabel("Préciser l'autre pathologie"),
+          _buildTextField(_otherPathologyController, "Veuillez préciser...", Icons.add_circle_outline),
+          const SizedBox(height: 16),
+        ],
+        
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            Expanded(
+              flex: 2,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildFieldLabel("Groupe sanguin"),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade50,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.grey.shade200),
+                    ),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<String>(
+                        value: _selectedBloodGroup,
+                        isExpanded: true,
+                        items: _bloodGroups.map((group) {
+                          return DropdownMenuItem(value: group, child: Text(group));
+                        }).toList(),
+                        onChanged: (val) => setState(() => _selectedBloodGroup = val!),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 16),
+            const Expanded(flex: 3, child: SizedBox()),
+          ],
+        ),
+        
+        const SizedBox(height: 24),
+        _buildFieldLabel("Observations médicales (optionnel)"),
+        _buildTextField(_medicalObservationsController, "Remarques complémentaires...", Icons.note_alt_outlined, isMultiline: true, validator: (v) => null),
       ],
     );
   }
@@ -665,7 +774,7 @@ class _AddUserPageState extends State<AddUserPage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   _buildFieldLabel("Numéro SIM (4G) associée"),
-                  _buildTextField(_simNumberController, "Ex: 216XXXXXXXX", Icons.sim_card_outlined),
+                  _buildTextField(_simNumberController, "12 345 678", Icons.sim_card_outlined, isPhone: true),
                 ],
               ),
             ),
@@ -705,9 +814,6 @@ class _AddUserPageState extends State<AddUserPage> {
             ),
           ],
         ),
-        const SizedBox(height: 24),
-        _buildFieldLabel("Notes de santé / État (Bénéficiaire)"),
-        _buildTextField(_healthNotesController, "Ex: Diabète, Difficultés motrices...", Icons.health_and_safety_outlined, isMultiline: true, validator: (v) => null),
       ],
     );
   }
@@ -925,25 +1031,81 @@ class _AddUserPageState extends State<AddUserPage> {
     );
   }
 
+  // Normalise an existing phone/SIM value → returns only the 8-digit part
+  static String _normalizePhoneDigits(String raw) {
+    // Strip known prefixes: +216, 00216, 216
+    String cleaned = raw.trim();
+    if (cleaned.startsWith('+216')) cleaned = cleaned.substring(4);
+    else if (cleaned.startsWith('00216')) cleaned = cleaned.substring(5);
+    else if (cleaned.startsWith('216') && cleaned.length > 3) cleaned = cleaned.substring(3);
+    // Keep only digits
+    cleaned = cleaned.replaceAll(RegExp(r'[^0-9]'), '');
+    // Trim to max 8 digits
+    if (cleaned.length > 8) cleaned = cleaned.substring(0, 8);
+    return cleaned;
+  }
+
+  // Returns the full +216XXXXXXXX value for sending to backend
+  static String _formatPhoneForBackend(String eightDigits) {
+    final digits = eightDigits.replaceAll(RegExp(r'[^0-9]'), '');
+    if (digits.isEmpty) return '';
+    return '+216$digits';
+  }
+
   Widget _buildTextField(
     TextEditingController controller, 
     String hint, 
     IconData icon, 
-    {bool isNumber = false, bool isMultiline = false, String? Function(String?)? validator, bool readOnly = false, bool enabled = true}
+    {bool isNumber = false, bool isPhone = false, bool isMultiline = false, String? Function(String?)? validator, bool readOnly = false, bool enabled = true}
   ) {
+    // For phone fields, pre-populate with only the 8-digit part of existing data
+    if (isPhone && controller.text.isNotEmpty) {
+      final normalized = _normalizePhoneDigits(controller.text);
+      if (controller.text != normalized) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (controller.text != normalized) controller.text = normalized;
+        });
+      }
+    }
+
     return TextFormField(
       controller: controller,
       readOnly: readOnly,
       enabled: enabled,
       maxLines: isMultiline ? 3 : 1,
-      keyboardType: isMultiline 
-          ? TextInputType.multiline 
-          : (isNumber ? TextInputType.number : TextInputType.text),
+      keyboardType: isPhone || isNumber
+          ? TextInputType.number
+          : (isMultiline ? TextInputType.multiline : TextInputType.text),
+      inputFormatters: isPhone
+          ? [
+              FilteringTextInputFormatter.digitsOnly,
+              LengthLimitingTextInputFormatter(8),
+            ]
+          : null,
       style: const TextStyle(color: Colors.black87, fontSize: 15),
       decoration: InputDecoration(
-        hintText: hint,
+        hintText: isPhone ? '12 345 678' : hint,
         hintStyle: TextStyle(color: Colors.grey.shade400),
-        prefixIcon: Icon(icon, color: Colors.grey.shade400, size: 20),
+        prefixIcon: isPhone
+            ? null
+            : Icon(icon, color: Colors.grey.shade400, size: 20),
+        prefix: isPhone
+            ? Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(icon, color: Colors.grey.shade400, size: 20),
+                  const SizedBox(width: 8),
+                  Text(
+                    '+216 ',
+                    style: TextStyle(
+                      color: Colors.grey.shade700,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 15,
+                    ),
+                  ),
+                ],
+              )
+            : null,
         filled: true,
         fillColor: Colors.grey.shade50,
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
@@ -960,7 +1122,15 @@ class _AddUserPageState extends State<AddUserPage> {
           borderSide: const BorderSide(color: AppTheme.primary, width: 2),
         ),
       ),
-      validator: validator ?? ((value) => value == null || value.isEmpty ? "Champ requis" : null),
+      validator: isPhone
+          ? (value) {
+              if (value == null || value.isEmpty) return 'Numéro requis';
+              if (value.replaceAll(RegExp(r'[^0-9]'), '').length != 8) {
+                return 'Le numéro doit contenir exactement 8 chiffres';
+              }
+              return null;
+            }
+          : (validator ?? ((value) => value == null || value.isEmpty ? 'Champ requis' : null)),
     );
   }
 
@@ -987,16 +1157,26 @@ class _AddUserPageState extends State<AddUserPage> {
       String formattedAddress = "${_streetController.text.trim()}, ${_cityController.text.trim()} ${_postalCodeController.text.trim()}, ${_countryController.text.trim()}".trim();
       if (formattedAddress.startsWith(',')) formattedAddress = formattedAddress.substring(1).trim();
 
+      // Encode medical data as JSON
+      final medicalInfo = {
+        "pathologies": _pathologies.entries.where((e) => e.value).map((e) => e.key).toList(),
+        "allergie_detail": _allergyDetailController.text.trim(),
+        "autre_detail": _otherPathologyController.text.trim(),
+        "groupe_sanguin": _selectedBloodGroup,
+        "observations": _medicalObservationsController.text.trim(),
+      };
+      final String medicalJson = jsonEncode(medicalInfo);
+
       final flatUserData = {
         "cin": _cinController.text.trim(),
         "nom": _fullNameController.text.trim(),
         "email": email,
         "age": _calculatedAge ?? 0,
         "adresse": formattedAddress,
-        "numero_de_telephone": _phoneController.text.trim(),
-        "contact_familial": _emergencyPhoneController.text.trim(),
-        "etat_de_sante": _healthNotesController.text.trim(),
-        "sim_de_la_canne": _simNumberController.text.trim(),
+        "numero_de_telephone": _formatPhoneForBackend(_phoneController.text.trim()),
+        "contact_familial": _formatPhoneForBackend(_emergencyPhoneController.text.trim()),
+        "etat_de_sante": medicalJson,
+        "sim_de_la_canne": _formatPhoneForBackend(_simNumberController.text.trim()),
         "role": "client",
       };
 
@@ -1010,9 +1190,9 @@ class _AddUserPageState extends State<AddUserPage> {
         final resUpdate = await UserService.updateUser(_cinController.text.trim(), {
           "nom": _fullNameController.text.trim(),
           "adresse": formattedAddress,
-          "numero_de_telephone": _phoneController.text.trim(),
-          "sim_de_la_canne": _simNumberController.text.trim(),
-          "etat_de_sante": _healthNotesController.text.trim(),
+          "numero_de_telephone": _formatPhoneForBackend(_phoneController.text.trim()),
+          "sim_de_la_canne": _formatPhoneForBackend(_simNumberController.text.trim()),
+          "etat_de_sante": medicalJson,
         });
         userSuccess = resUpdate["success"];
         errorMessage = resUpdate["error"];
@@ -1020,7 +1200,7 @@ class _AddUserPageState extends State<AddUserPage> {
 
       if (userSuccess) {
         // 3. Update Cane status
-        await CaneService.updateCane(_simNumberController.text.trim(), {
+        await CaneService.updateCane(_formatPhoneForBackend(_simNumberController.text.trim()), {
           "statut": "vendue",
           "version": _selectedCaneVersion,
           "type": "vente"
@@ -1028,7 +1208,7 @@ class _AddUserPageState extends State<AddUserPage> {
 
         // 4. Create Abonnement record for Sales
         await SubscriptionService.createSubscription({
-          "sim_de_la_canne": _simNumberController.text.trim(),
+          "sim_de_la_canne": _formatPhoneForBackend(_simNumberController.text.trim()),
           "cin_utilisateur": _cinController.text.trim(),
           "type_d_abonnement": _selectedCaneVersion.contains("Lite") ? "essential" : "premium",
           "date_de_fin": "${_subEndDate.year}-${_subEndDate.month.toString().padLeft(2, '0')}-${_subEndDate.day.toString().padLeft(2, '0')}",
@@ -1062,9 +1242,9 @@ class _AddUserPageState extends State<AddUserPage> {
       "nom": _fullNameController.text.trim(),
       "cin": _cinController.text.trim(),
       "email": _emailController.text.trim(),
-      "numero_de_telephone": _phoneController.text.trim(),
+      "numero_de_telephone": _formatPhoneForBackend(_phoneController.text.trim()),
       "emergency_name": _emergencyNameController.text.trim(),
-      "emergency_phone": _emergencyPhoneController.text.trim(),
+      "emergency_phone": _formatPhoneForBackend(_emergencyPhoneController.text.trim()),
       "emergency_relation": _emergencyRelationController.text.trim(),
       "birth_date": _birthDateController.text,
       "address": {
@@ -1082,7 +1262,7 @@ class _AddUserPageState extends State<AddUserPage> {
         "subscription_price": _subscriptionPrice.toString(),
         "cane_price": _canePrice.toString(),
       },
-      "sim_de_la_canne": _simNumberController.text.trim(),
+      "sim_de_la_canne": _formatPhoneForBackend(_simNumberController.text.trim()),
       "version_canne": _selectedCaneVersion,
     };
 

@@ -72,7 +72,8 @@ class TopNavbar extends StatelessWidget {
                       _buildNavItem("Dashboard", Icons.dashboard_rounded, "/dashboard", isNarrow),
                       _buildNavItem("Alertes Live", Icons.notification_important_rounded, "/alerts", isNarrow),
                       _buildNavItem("Historique", Icons.history_rounded, "/history", isNarrow),
-                      _buildNavItem("Staff", Icons.badge_rounded, "/staff", isNarrow),
+                      if (BaseService.isAdmin)
+                        _buildNavItem("Staff", Icons.badge_rounded, "/staff", isNarrow),
                       _buildNavItem("Gestion Location", Icons.shopping_cart_rounded, "/rentals", isNarrow),
                       _buildNavItem("Enregistrement Ventes", Icons.person_add_alt_1_rounded, "/add-user", isNarrow),
                     ],

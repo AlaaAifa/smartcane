@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'dart:convert';
 import '../theme.dart';
 import '../../services/services.dart';
 import 'rental_contract_page.dart';
@@ -20,11 +22,30 @@ class _CaneRentalsPageState extends State<CaneRentalsPage> {
   final _cinController = TextEditingController();
   final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
-  final _streetController = TextEditingController(); // Replaced _addressController
+  final _streetController = TextEditingController(); 
   final _cityController = TextEditingController();
   final _postalCodeController = TextEditingController();
   final _countryController = TextEditingController();
   final _healthNotesController = TextEditingController();
+
+  // Structured Medical Info
+  final Map<String, bool> _pathologies = {
+    "Diabète": false,
+    "Hypertension": false,
+    "Maladie cardiaque": false,
+    "Épilepsie": false,
+    "Troubles de l’équilibre / Vertiges": false,
+    "Difficulté de mobilité": false,
+    "Baisse auditive": false,
+    "Allergies médicamenteuses": false,
+    "Aucune pathologie connue": false,
+    "Autre": false,
+  };
+  final _allergyDetailController = TextEditingController();
+  final _otherPathologyController = TextEditingController();
+  String _selectedBloodGroup = "Inconnu";
+  final List<String> _bloodGroups = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-", "Inconnu"];
+  final _medicalObservationsController = TextEditingController();
 
   // Emergency Contact
   final _emergencyNameController = TextEditingController();
@@ -46,7 +67,7 @@ class _CaneRentalsPageState extends State<CaneRentalsPage> {
   String _selectedVersion = "Smart Pro V2";
   final List<String> _versions = ["Smart Pro V2", "Smart Pro V3", "Smart Lite"];
   bool _isSubmitting = false;
-  int _currentStep = 0; // 0: Selection, 1: Details, 2: Form
+  int _currentStep = 0; // 0: Selection, 1: Details, 2-7: Wizard
 
   // Rental price / month per version
   final Map<String, int> _monthlyPrices = {
@@ -74,8 +95,6 @@ class _CaneRentalsPageState extends State<CaneRentalsPage> {
   bool _isPaymentConfirmed = false;
   String _paymentMethod = "Espèces";
 
-  // Removed _calculatedEndDate and _parseDate helpers as we now use DateTime objects directly
-
   @override
   void dispose() {
     _fullNameController.dispose();
@@ -88,6 +107,9 @@ class _CaneRentalsPageState extends State<CaneRentalsPage> {
     _postalCodeController.dispose();
     _countryController.dispose();
     _healthNotesController.dispose();
+    _allergyDetailController.dispose();
+    _otherPathologyController.dispose();
+    _medicalObservationsController.dispose();
     _emergencyNameController.dispose();
     _emergencyPhoneController.dispose();
     _emergencyRelationController.dispose();
@@ -290,7 +312,7 @@ class _CaneRentalsPageState extends State<CaneRentalsPage> {
     switch (_currentStep) {
       case 2: return "Étape 1 : Coordonnées du bénéficiaire";
       case 3: return "Étape 2 : Adresse de résidence";
-      case 4: return "Étape 3 : Contact d'urgence";
+      case 4: return "Étape 3 : Urgence et Santé";
       case 5: return "Étape 4 : Équipement et Période de location";
       case 6: return "Étape 5 : Règlement et Paiement";
       case 7: return "Étape 6 : Récapitulatif et Signature du contrat";
@@ -656,7 +678,7 @@ class _CaneRentalsPageState extends State<CaneRentalsPage> {
         ),
         const SizedBox(height: 24),
         _buildFieldLabel("Téléphone principal"),
-        _buildTextField(_phoneController, "01 23 45 67 89", Icons.phone_outlined, isNumber: true),
+        _buildTextField(_phoneController, "12 345 678", Icons.phone_outlined, isPhone: true),
       ],
     );
   }
@@ -700,7 +722,7 @@ class _CaneRentalsPageState extends State<CaneRentalsPage> {
 
   Widget _buildStepEmergencyContact() {
     return _buildStepContainer(
-      title: "III. CONTACT D'URGENCE",
+      title: "III. URGENCE ET INFORMATIONS MÉDICALES",
       icon: Icons.emergency_outlined,
       children: [
         _buildFieldLabel("Nom du contact d'urgence"),
@@ -723,12 +745,98 @@ class _CaneRentalsPageState extends State<CaneRentalsPage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   _buildFieldLabel("Numéro de téléphone"),
-                  _buildTextField(_emergencyPhoneController, "Numéro permanent", Icons.phone_enabled_outlined, isNumber: true),
+                  _buildTextField(_emergencyPhoneController, "12 345 678", Icons.phone_enabled_outlined, isPhone: true),
                 ],
               ),
             ),
           ],
         ),
+        const SizedBox(height: 32),
+        const Divider(),
+        const SizedBox(height: 16),
+        _buildSectionHeader(Icons.health_and_safety_outlined, "SANTÉ DU BÉNÉFICIAIRE"),
+        const SizedBox(height: 24),
+        
+        // Pathologies (Grid-like layout)
+        _buildFieldLabel("Antécédents / Pathologies (Sélection multiple)"),
+        Wrap(
+          spacing: 12,
+          runSpacing: 8,
+          children: _pathologies.keys.map((pathology) {
+            return FilterChip(
+              label: Text(pathology),
+              selected: _pathologies[pathology]!,
+              onSelected: (selected) {
+                setState(() {
+                  if (pathology == "Aucune pathologie connue" && selected) {
+                    _pathologies.updateAll((key, value) => false);
+                  } else if (selected) {
+                    _pathologies["Aucune pathologie connue"] = false;
+                  }
+                  _pathologies[pathology] = selected;
+                });
+              },
+              selectedColor: AppTheme.primary.withOpacity(0.2),
+              checkmarkColor: AppTheme.primary,
+              labelStyle: TextStyle(
+                color: _pathologies[pathology]! ? AppTheme.primary : Colors.black87,
+                fontWeight: _pathologies[pathology]! ? FontWeight.bold : FontWeight.normal,
+              ),
+            );
+          }).toList(),
+        ),
+        
+        const SizedBox(height: 16),
+        if (_pathologies["Allergies médicamenteuses"]!) ...[
+          _buildFieldLabel("Préciser le(s) médicament(s)"),
+          _buildTextField(_allergyDetailController, "Quelles allergies ?", Icons.warning_amber_outlined),
+          const SizedBox(height: 16),
+        ],
+        
+        if (_pathologies["Autre"]!) ...[
+          _buildFieldLabel("Préciser l'autre pathologie"),
+          _buildTextField(_otherPathologyController, "Veuillez préciser...", Icons.add_circle_outline),
+          const SizedBox(height: 16),
+        ],
+        
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            Expanded(
+              flex: 2,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildFieldLabel("Groupe sanguin"),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade50,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.grey.shade200),
+                    ),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<String>(
+                        value: _selectedBloodGroup,
+                        isExpanded: true,
+                        items: _bloodGroups.map((group) {
+                          return DropdownMenuItem(value: group, child: Text(group));
+                        }).toList(),
+                        onChanged: (val) => setState(() => _selectedBloodGroup = val!),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 16),
+            const Expanded(flex: 3, child: SizedBox()),
+          ],
+        ),
+        
+        const SizedBox(height: 24),
+        _buildFieldLabel("Observations médicales (optionnel)"),
+        _buildTextField(_medicalObservationsController, "Remarques complémentaires...", Icons.note_alt_outlined, isMultiline: true, validator: (v) => null),
       ],
     );
   }
@@ -759,7 +867,7 @@ class _CaneRentalsPageState extends State<CaneRentalsPage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   _buildFieldLabel("Numéro SIM (4G) louée"),
-                  _buildTextField(_simNumberController, "Ex: 216XXXXXXXX", Icons.sim_card_outlined),
+                  _buildTextField(_simNumberController, "12 345 678", Icons.sim_card_outlined, isPhone: true),
                 ],
               ),
             ),
@@ -799,132 +907,7 @@ class _CaneRentalsPageState extends State<CaneRentalsPage> {
             ),
           ],
         ),
-        const SizedBox(height: 24),
-        _buildFieldLabel("Notes de santé / Pathologies (Bénéficiaire)"),
-        _buildTextField(_healthNotesController, "Ex: Diabète, Difficultés motrices...", Icons.health_and_safety_outlined, isMultiline: true, validator: (v) => null),
       ],
-    );
-  }
-
-  Widget _buildVersionSelection() {
-    return Column(
-      children: [
-        SizedBox(
-          height: 180,
-          child: _buildVersionCard("Smart Lite", "Le plus léger", "NOUVEAUTÉ", Colors.blue, ["48h autonomie", "Léger 200g"]),
-        ),
-        const SizedBox(height: 16),
-        SizedBox(
-          height: 180,
-          child: _buildVersionCard("Smart Pro V2", "Équilibre parfait", "POPULAIRE", Colors.indigo, ["Radar 3m", "Haptique"]),
-        ),
-        const SizedBox(height: 16),
-        SizedBox(
-          height: 180,
-          child: _buildVersionCard("Smart Pro V3", "L'excellence IA", "PRÉDICTION", Colors.deepPurple, ["LiDAR & Caméra", "5G Ready"]),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildVersionCard(String title, String subtitle, String badge, Color color, List<String> features) {
-    return _CaneVersionCard(
-      title: title,
-      subtitle: subtitle,
-      badge: badge,
-      badgeColor: color,
-      features: features,
-      isSelected: _selectedVersion == title,
-      onTap: () {
-        setState(() {
-          _selectedVersion = title;
-          if (_currentStep == 0) _currentStep = 1;
-        });
-      },
-    );
-  }
-
-
-  Widget _buildBulletInfo(IconData icon, String text) {
-    return Row(
-      children: [
-        Icon(icon, color: AppTheme.normalGreen, size: 20),
-        const SizedBox(width: 12),
-        Text(text, style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 13)),
-      ],
-    );
-  }
-
-  Widget _buildStepContractDetails() {
-    return _buildStepContainer(
-      title: "VI. RÉCAPITULATIF DU CONTRAT",
-      icon: Icons.description_outlined,
-      children: [
-        Container(
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            color: AppTheme.primary.withOpacity(0.05),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppTheme.primary.withOpacity(0.1)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text("Détails de la Période", style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.primary)),
-              const Divider(),
-              _infoRow("Date de début", _startDateController.text),
-              _infoRow("Date de fin", _endDateController.text),
-              _infoRow("Durée totale", "$_rentalDurationMonths mois"),
-              const SizedBox(height: 20),
-              const Text("Détails Financiers", style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.primary)),
-              const Divider(),
-              _infoRow("Modèle", _selectedVersion),
-              _infoRow("Tarif mensuel", "$_monthlyRate TND"),
-              const SizedBox(height: 12),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text("TOTAL DU CONTRAT", style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
-                  Text("$_totalRentalPrice TND", style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: AppTheme.primary)),
-                ],
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 24),
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: AppTheme.normalGreen.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Row(
-            children: [
-              const Icon(Icons.verified, color: AppTheme.normalGreen),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  "Paiement de $_totalRentalPrice TND validé par $_paymentMethod",
-                  style: const TextStyle(fontWeight: FontWeight.bold, color: AppTheme.normalGreen),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _infoRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(label, style: const TextStyle(color: Colors.grey)),
-          Text(value, style: const TextStyle(fontWeight: FontWeight.bold)),
-        ],
-      ),
     );
   }
 
@@ -1018,8 +1001,82 @@ class _CaneRentalsPageState extends State<CaneRentalsPage> {
     );
   }
 
-  Widget _buildFormSection() => const SizedBox();
+  Widget _buildStepContractDetails() {
+    return _buildStepContainer(
+      title: "VI. RÉCAPITULATIF DU CONTRAT",
+      icon: Icons.description_outlined,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: AppTheme.primary.withOpacity(0.05),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: AppTheme.primary.withOpacity(0.1)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text("Détails de la Période", style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.primary)),
+              const Divider(),
+              _infoRow("Date de début", _startDateController.text),
+              _infoRow("Date de fin", _endDateController.text),
+              _infoRow("Durée totale", "$_rentalDurationMonths mois"),
+              const SizedBox(height: 20),
+              const Text("Détails Financiers", style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.primary)),
+              const Divider(),
+              _infoRow("Modèle", _selectedVersion),
+              _infoRow("Tarif mensuel", "$_monthlyRate TND"),
+              const SizedBox(height: 12),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text("TOTAL DU CONTRAT", style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
+                  Text("$_totalRentalPrice TND", style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: AppTheme.primary)),
+                ],
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 24),
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppTheme.normalGreen.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.verified, color: AppTheme.normalGreen),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  "Paiement de $_totalRentalPrice TND validé par $_paymentMethod",
+                  style: const TextStyle(fontWeight: FontWeight.bold, color: AppTheme.normalGreen),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
 
+  Widget _buildVersionCard(String title, String subtitle, String badge, Color color, List<String> features) {
+    return _CaneVersionCard(
+      title: title,
+      subtitle: subtitle,
+      badge: badge,
+      badgeColor: color,
+      features: features,
+      isSelected: _selectedVersion == title,
+      onTap: () {
+        setState(() {
+          _selectedVersion = title;
+          if (_currentStep == 0) _currentStep = 1;
+        });
+      },
+    );
+  }
 
   Widget _buildPaymentRadio(String method, IconData icon) {
     bool isSelected = _paymentMethod == method;
@@ -1081,25 +1138,74 @@ class _CaneRentalsPageState extends State<CaneRentalsPage> {
     );
   }
 
+  // Normalise an existing phone/SIM value → returns only the 8-digit part
+  static String _normalizePhoneDigits(String raw) {
+    String cleaned = raw.trim();
+    if (cleaned.startsWith('+216')) cleaned = cleaned.substring(4);
+    else if (cleaned.startsWith('00216')) cleaned = cleaned.substring(5);
+    else if (cleaned.startsWith('216') && cleaned.length > 3) cleaned = cleaned.substring(3);
+    cleaned = cleaned.replaceAll(RegExp(r'[^0-9]'), '');
+    if (cleaned.length > 8) cleaned = cleaned.substring(0, 8);
+    return cleaned;
+  }
+
+  static String _formatPhoneForBackend(String eightDigits) {
+    final digits = eightDigits.replaceAll(RegExp(r'[^0-9]'), '');
+    if (digits.isEmpty) return '';
+    return '+216$digits';
+  }
+
   Widget _buildTextField(
     TextEditingController controller, 
     String hint, 
     IconData icon, 
-    {bool isNumber = false, bool isMultiline = false, String? Function(String?)? validator, bool readOnly = false, bool enabled = true}
+    {bool isNumber = false, bool isPhone = false, bool isMultiline = false, String? Function(String?)? validator, bool readOnly = false, bool enabled = true}
   ) {
+    if (isPhone && controller.text.isNotEmpty) {
+      final normalized = _normalizePhoneDigits(controller.text);
+      if (controller.text != normalized) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (controller.text != normalized) controller.text = normalized;
+        });
+      }
+    }
+
     return TextFormField(
       controller: controller,
       readOnly: readOnly,
       enabled: enabled,
       maxLines: isMultiline ? 3 : 1,
-      keyboardType: isMultiline 
-          ? TextInputType.multiline 
-          : (isNumber ? TextInputType.number : TextInputType.text),
+      keyboardType: isPhone || isNumber
+          ? TextInputType.number
+          : (isMultiline ? TextInputType.multiline : TextInputType.text),
+      inputFormatters: isPhone
+          ? [
+              FilteringTextInputFormatter.digitsOnly,
+              LengthLimitingTextInputFormatter(8),
+            ]
+          : null,
       style: const TextStyle(color: Colors.black87, fontSize: 15),
       decoration: InputDecoration(
-        hintText: hint,
+        hintText: isPhone ? '12 345 678' : hint,
         hintStyle: TextStyle(color: Colors.grey.shade400),
-        prefixIcon: Icon(icon, color: Colors.grey.shade400, size: 20),
+        prefixIcon: isPhone ? null : Icon(icon, color: Colors.grey.shade400, size: 20),
+        prefix: isPhone
+            ? Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(icon, color: Colors.grey.shade400, size: 20),
+                  const SizedBox(width: 8),
+                  Text(
+                    '+216 ',
+                    style: TextStyle(
+                      color: Colors.grey.shade700,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 15,
+                    ),
+                  ),
+                ],
+              )
+            : null,
         filled: true,
         fillColor: Colors.grey.shade50,
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
@@ -1116,7 +1222,15 @@ class _CaneRentalsPageState extends State<CaneRentalsPage> {
           borderSide: const BorderSide(color: AppTheme.primary, width: 2),
         ),
       ),
-      validator: validator ?? ((value) => value == null || value.isEmpty ? "Champ requis" : null),
+      validator: isPhone
+          ? (value) {
+              if (value == null || value.isEmpty) return 'Numéro requis';
+              if (value.replaceAll(RegExp(r'[^0-9]'), '').length != 8) {
+                return 'Le numéro doit contenir exactement 8 chiffres';
+              }
+              return null;
+            }
+          : (validator ?? ((value) => value == null || value.isEmpty ? 'Champ requis' : null)),
     );
   }
 
@@ -1125,6 +1239,16 @@ class _CaneRentalsPageState extends State<CaneRentalsPage> {
     
     setState(() => _isSubmitting = true);
 
+    // Encode medical data as JSON
+    final medicalInfo = {
+      "pathologies": _pathologies.entries.where((e) => e.value).map((e) => e.key).toList(),
+      "allergie_detail": _allergyDetailController.text.trim(),
+      "autre_detail": _otherPathologyController.text.trim(),
+      "groupe_sanguin": _selectedBloodGroup,
+      "observations": _medicalObservationsController.text.trim(),
+    };
+    final String medicalJson = jsonEncode(medicalInfo);
+
     // 1. Collect all data
     final Map<String, dynamic> rentalData = {
       "full_name": _fullNameController.text,
@@ -1132,18 +1256,18 @@ class _CaneRentalsPageState extends State<CaneRentalsPage> {
       "age": _calculatedAge?.toString() ?? "0",
       "adresse": "${_streetController.text.trim()}, ${_cityController.text.trim()} ${_postalCodeController.text.trim()}, ${_countryController.text.trim()}".trim(),
       "email": _emailController.text.trim(),
-      "telephone": _phoneController.text.trim(),
+      "telephone": _formatPhoneForBackend(_phoneController.text.trim()),
       "cin": _cinController.text,
-      "phone": _phoneController.text,
+      "phone": _formatPhoneForBackend(_phoneController.text.trim()),
       "address": {
         "street": _streetController.text.trim(),
         "city": _cityController.text.trim(),
         "postal_code": _postalCodeController.text.trim(),
         "country": _countryController.text.trim(),
       },
-      "health_notes": _healthNotesController.text,
+      "health_notes": medicalJson,
       "emergency_name": _emergencyNameController.text,
-      "emergency_phone": _emergencyPhoneController.text,
+      "emergency_phone": _formatPhoneForBackend(_emergencyPhoneController.text.trim()),
       "emergency_relation": _emergencyRelationController.text,
       "start_date": _startDateController.text,
       "end_date": _endDateController.text,
@@ -1151,7 +1275,7 @@ class _CaneRentalsPageState extends State<CaneRentalsPage> {
       "internal_notes": _internalNotesController.text,
       "model": _selectedVersion,
       "formation_needed": _formationNecessaire,
-      "sim_number": _simNumberController.text,
+      "sim_number": _formatPhoneForBackend(_simNumberController.text.trim()),
       "total_price": _totalRentalPrice,
       "payment_method": _paymentMethod,
     };
@@ -1179,6 +1303,19 @@ class _CaneRentalsPageState extends State<CaneRentalsPage> {
         ));
       }
     }
+  }
+
+  Widget _infoRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: const TextStyle(color: Colors.grey)),
+          Text(value, style: const TextStyle(fontWeight: FontWeight.bold)),
+        ],
+      ),
+    );
   }
 }
 
@@ -1255,182 +1392,63 @@ class _CaneVersionCardState extends State<_CaneVersionCard> {
                 ),
               ],
             ),
-            child: _buildFullOverlayLayout(imagePath, defaultIcon),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildFullOverlayLayout(String imagePath, IconData defaultIcon) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(19),
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          // 1. Single Background Image (Full screen / Immersive)
-          Image.asset(
-            imagePath,
-            fit: BoxFit.cover,
-            alignment: const Alignment(0, -0.5), // Cadrage visuel optimal pour objet vertical
-          ),
-          
-          // 2. Linear Gradient for Readability
-          Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  Colors.black.withOpacity(0.0),
-                  Colors.black.withOpacity(0.1),
-                  Colors.black.withOpacity(0.4),
-                  Colors.black.withOpacity(0.9),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(19),
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  Image.asset(imagePath, fit: BoxFit.cover, alignment: const Alignment(0, -0.5)),
+                  Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.black.withOpacity(0.0),
+                          Colors.black.withOpacity(0.1),
+                          Colors.black.withOpacity(0.4),
+                          Colors.black.withOpacity(0.9),
+                        ],
+                        stops: const [0.0, 0.3, 0.6, 1.0],
+                      ),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.all(28),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(color: widget.badgeColor, borderRadius: BorderRadius.circular(6)),
+                          child: Text(widget.badge, style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900)),
+                        ),
+                        const SizedBox(height: 14),
+                        Text(widget.title, style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w900, color: Colors.white, letterSpacing: -0.8)),
+                        const SizedBox(height: 10),
+                        Text(widget.subtitle, maxLines: 2, style: TextStyle(fontSize: 15, color: Colors.white.withOpacity(0.85), height: 1.4)),
+                        const SizedBox(height: 24),
+                        ...widget.features.map((f) => Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.check_circle_rounded, color: AppTheme.normalGreen, size: 16),
+                              const SizedBox(width: 10),
+                              Expanded(child: Text(f, style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w500))),
+                            ],
+                          ),
+                        )),
+                        const SizedBox(height: 10),
+                      ],
+                    ),
+                  ),
                 ],
-                stops: const [0.0, 0.3, 0.6, 1.0],
               ),
             ),
           ),
-          
-          // 3. Content
-          Padding(
-            padding: const EdgeInsets.all(28),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: widget.badgeColor,
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Text(
-                    widget.badge,
-                    style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900),
-                  ),
-                ),
-                const SizedBox(height: 14),
-                Text(
-                  widget.title,
-                  style: const TextStyle(
-                    fontSize: 32,
-                    fontWeight: FontWeight.w900,
-                    color: Colors.white,
-                    letterSpacing: -0.8,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                Text(
-                  widget.subtitle,
-                  maxLines: 2,
-                  style: TextStyle(
-                    fontSize: 15,
-                    color: Colors.white.withOpacity(0.85),
-                    height: 1.4,
-                  ),
-                ),
-                const SizedBox(height: 24),
-                ...widget.features.map((f) => Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.check_circle_rounded, color: AppTheme.normalGreen, size: 16),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(f, style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w500)),
-                      ),
-                    ],
-                  ),
-                )),
-                const SizedBox(height: 10),
-              ],
-            ),
-          ),
-        ],
+        ),
       ),
-    );
-  }
-
-  Widget _buildCleanProLayout(String imagePath, IconData defaultIcon) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          height: 200,
-          width: double.infinity,
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-            border: Border(bottom: BorderSide(color: Colors.grey.shade100, width: 1)),
-          ),
-          child: ClipRRect(
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-            child: Stack(
-              children: [
-                Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(15),
-                    child: Hero(
-                      tag: 'cane_image_${widget.title}',
-                      child: Image.asset(
-                        imagePath,
-                        fit: BoxFit.contain,
-                        alignment: Alignment.center,
-                        errorBuilder: (context, error, stackTrace) => 
-                            Icon(defaultIcon, size: 60, color: widget.badgeColor.withOpacity(0.1)),
-                      ),
-                    ),
-                  ),
-                ),
-                Positioned(
-                  top: 12,
-                  right: 12,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: widget.badgeColor.withOpacity(0.08),
-                      borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: widget.badgeColor.withOpacity(0.1), width: 0.5),
-                    ),
-                    child: Text(
-                      widget.badge,
-                      style: TextStyle(color: widget.badgeColor, fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 0.5),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-        Expanded(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(widget.title, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: Color(0xFF1D1D1F))),
-                const SizedBox(height: 8),
-                Text(widget.subtitle, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 14, color: Colors.grey.shade700, height: 1.4)),
-                const Spacer(),
-                ...widget.features.map((f) => Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.check_circle_rounded, color: AppTheme.normalGreen, size: 16),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(f, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: Colors.black87)),
-                      ),
-                    ],
-                  ),
-                )),
-                const Spacer(),
-              ],
-            ),
-          ),
-        ),
-      ],
     );
   }
 }

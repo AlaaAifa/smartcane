@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'dart:convert';
 
 class AppTheme {
   // Color System
@@ -57,5 +58,43 @@ class AppTheme {
         ),
       ),
     );
+  }
+
+  static String formatHealthInfo(String? raw) {
+    if (raw == null || raw.isEmpty) return "N/A";
+    if (!raw.trim().startsWith('{')) return raw;
+
+    try {
+      final data = jsonDecode(raw);
+      final List<String> parts = [];
+
+      if (data["groupe_sanguin"] != null && data["groupe_sanguin"] != "Inconnu") {
+        parts.add("Groupe: ${data["groupe_sanguin"]}");
+      }
+
+      final List pathologies = data["pathologies"] ?? [];
+      if (pathologies.isNotEmpty) {
+        if (pathologies.contains("Aucune pathologie connue")) {
+          parts.add("Aucune pathologie");
+        } else {
+          String pathStr = pathologies.join(", ");
+          if (data["allergie_detail"]?.toString().isNotEmpty ?? false) {
+            pathStr = pathStr.replaceAll("Allergies médicamenteuses", "Allergies (${data["allergie_detail"]})");
+          }
+          if (data["autre_detail"]?.toString().isNotEmpty ?? false) {
+            pathStr = pathStr.replaceAll("Autre", "Autre (${data["autre_detail"]})");
+          }
+          parts.add("Pathologies: $pathStr");
+        }
+      }
+
+      if (data["observations"]?.toString().isNotEmpty ?? false) {
+        parts.add("Obs: ${data["observations"]}");
+      }
+
+      return parts.isEmpty ? "Stable" : parts.join(" | ");
+    } catch (e) {
+      return raw;
+    }
   }
 }
