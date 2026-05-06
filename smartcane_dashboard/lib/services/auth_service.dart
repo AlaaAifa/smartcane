@@ -17,6 +17,7 @@ class AuthService {
         BaseService.role = data["role"];
         BaseService.staffName = data["name"];
         BaseService.staffId = data["staff_id"];
+        BaseService.staffPhotoUrl = data["photo_url"];
         return data;
       } else if (res.statusCode == 401) {
         return {"error": "Email ou mot de passe incorrect"};

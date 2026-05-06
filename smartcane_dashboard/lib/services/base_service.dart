@@ -4,6 +4,7 @@ class BaseService {
   static String? role;
   static String? staffName;
   static String? staffId;
+  static String? staffPhotoUrl;
 
   static Map<String, String> get headers => {
     "Content-Type": "application/json",
@@ -17,5 +18,6 @@ class BaseService {
     role = null;
     staffName = null;
     staffId = null;
+    staffPhotoUrl = null;
   }
 }

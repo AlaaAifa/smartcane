@@ -338,15 +338,18 @@
                             </svg>
                         </a>
                     </div>
-                    <form class="space-y-4 bg-white p-8 rounded-3xl shadow-xl border border-gray-100">
+                    <form id="contactForm" class="space-y-4 bg-white p-8 rounded-3xl shadow-xl border border-gray-100">
                         <h3 class="text-xl font-bold text-primary mb-4">Envoyez-nous un message</h3>
                         <div class="grid grid-cols-2 gap-4">
-                            <input type="text" placeholder="Prénom" class="w-full p-4 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all">
-                            <input type="text" placeholder="Nom" class="w-full p-4 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all">
+                            <input type="text" id="firstname" placeholder="Prénom" required class="w-full p-4 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all">
+                            <input type="text" id="lastname" placeholder="Nom" required class="w-full p-4 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all">
                         </div>
-                        <input type="email" placeholder="Email" class="w-full p-4 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all">
-                        <textarea placeholder="Votre message" rows="4" class="w-full p-4 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"></textarea>
-                        <button type="submit" class="w-full bg-primary text-white p-4 rounded-xl font-bold hover:bg-primary-light transition-all shadow-lg shadow-primary/20">Envoyer le message</button>
+                        <input type="email" id="email" placeholder="Email" required class="w-full p-4 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all">
+                        <input type="text" id="subject" placeholder="Sujet" required class="w-full p-4 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all">
+                        <textarea id="message" placeholder="Votre message" rows="4" required class="w-full p-4 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"></textarea>
+                        <button type="submit" id="submitBtn" class="w-full bg-primary text-white p-4 rounded-xl font-bold hover:bg-primary-light transition-all shadow-lg shadow-primary/20 flex items-center justify-center gap-2">
+                            <span>Envoyer le message</span>
+                        </button>
                     </form>
                 </div>
             </div>
@@ -394,6 +397,85 @@
             </div>
         </div>
     </footer>
+
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/10.10.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.10.0/firebase-database-compat.js"></script>
+
+    <script>
+        // Firebase Configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyCyQF1n2S7CYyzqlacSetIXv7_8KZ04hGQ",
+            authDomain: "smartcane-97717.firebaseapp.com",
+            databaseURL: "https://smartcane-97717-default-rtdb.europe-west1.firebasedatabase.app",
+            projectId: "smartcane-97717",
+            storageBucket: "smartcane-97717.firebasestorage.app",
+            messagingSenderId: "178098479712",
+            appId: "1:178098479712:web:5121de6088c7e848f89905",
+            measurementId: "G-N56QLD2K56"
+        };
+
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+
+        // Form Handling
+        const contactForm = document.getElementById('contactForm');
+        const submitBtn = document.getElementById('submitBtn');
+
+        contactForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            
+            // Get values
+            const firstname = document.getElementById('firstname').value;
+            const lastname = document.getElementById('lastname').value;
+            const email = document.getElementById('email').value;
+            const subject = document.getElementById('subject').value;
+            const message = document.getElementById('message').value;
+
+            // UI Feedback
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<span>Envoi en cours...</span>';
+
+            // Push to Firebase
+            const messagesRef = database.ref('messages');
+            const newMessageRef = messagesRef.push();
+            
+            newMessageRef.set({
+                firstname,
+                lastname,
+                email,
+                subject,
+                message,
+                status: 'unread',
+                created_at: firebase.database.ServerValue.TIMESTAMP,
+                reply_subject: '',
+                reply_body: '',
+                replied_at: null,
+                staff_name: ''
+            }).then(() => {
+                // Success
+                contactForm.reset();
+                submitBtn.innerHTML = '<span>Message envoyé !</span>';
+                submitBtn.classList.remove('bg-primary');
+                submitBtn.classList.add('bg-success');
+                
+                setTimeout(() => {
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = '<span>Envoyer le message</span>';
+                    submitBtn.classList.remove('bg-success');
+                    submitBtn.classList.add('bg-primary');
+                }, 3000);
+
+                alert("Merci ! Votre message a été envoyé avec succès. Notre équipe vous répondra bientôt.");
+            }).catch((error) => {
+                console.error("Firebase Error:", error);
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '<span>Envoyer le message</span>';
+                alert("Une erreur est survenue lors de l'envoi. Veuillez réessayer.");
+            });
+        });
+    </script>
 
     <!-- Scripts -->
     <script src="./js/script.js"></script>

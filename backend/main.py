@@ -7,6 +7,7 @@ from backend.controllers.auth_controller import router as auth_router
 from backend.controllers.cannes_controller import router as cannes_router
 from backend.controllers.locations_controller import router as locations_router
 from backend.controllers.utilisateurs_controller import router as utilisateurs_router
+from backend.controllers.messages_controller import router as messages_router
 from backend.database import engine, Base
 from backend.models import Abonnement, Alert, Canne, Location, Utilisateur, ResetCode
 
@@ -39,9 +40,10 @@ app.include_router(locations_router)
 app.include_router(abonnements_router)
 app.include_router(alerts_router)
 app.include_router(auth_router)
+app.include_router(messages_router)
 
 
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run("backend.main:app", host="0.0.0.0", port=800, reload=True)
+    uvicorn.run("backend.main:app", host="0.0.0.0", port=8000, reload=True)

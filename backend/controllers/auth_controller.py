@@ -28,7 +28,8 @@ def login(req: LoginRequest, db: Session = Depends(get_db)):
                 "token": f"token_{user.cin}",
                 "role": role,
                 "name": user.nom,
-                "staff_id": user.cin
+                "staff_id": user.cin,
+                "photo_url": user.photo_url
             }
         else:
             # Mot de passe incorrect pour un utilisateur existant

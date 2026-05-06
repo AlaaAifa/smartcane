@@ -12,6 +12,7 @@ class UtilisateurBase(BaseModel):
     email: EmailStr
     numero_de_telephone: Optional[str] = None
     role: str
+    photo_url: Optional[str] = None
 
 
 class UtilisateurCreate(UtilisateurBase):
@@ -25,6 +26,7 @@ class UtilisateurUpdate(BaseModel):
     email: Optional[EmailStr] = None
     numero_de_telephone: Optional[str] = None
     role: Optional[str] = None
+    photo_url: Optional[str] = None
 
 
 class Utilisateur(UtilisateurBase):
@@ -154,14 +156,19 @@ class Abonnement(AbonnementBase):
 
 
 class AlertBase(BaseModel):
-    user_id: str
+    user_id: Optional[str] = None
     type: str
     latitude: float
     longitude: float
+    cane_status: Optional[str] = "normal"
 
 
 class AlertCreate(AlertBase):
     alert_id: str
+    status: Optional[str] = "active"
+    resolved_by: Optional[str] = None
+    resolved_at: Optional[datetime] = None
+    response_time: Optional[str] = None
 
 
 class AlertUpdate(BaseModel):
@@ -170,18 +177,26 @@ class AlertUpdate(BaseModel):
     latitude: Optional[float] = None
     longitude: Optional[float] = None
     status: Optional[str] = None
+    cane_status: Optional[str] = None
     resolved_by: Optional[str] = None
     resolved_at: Optional[datetime] = None
     taken_by: Optional[str] = None
+    response_time: Optional[str] = None
+    reactivated_by: Optional[str] = None
+    reactivated_at: Optional[datetime] = None
 
 
 class Alert(AlertBase):
     alert_id: str
     timestamp: datetime
     status: str
+    cane_status: str
     resolved_by: Optional[str] = None
     resolved_at: Optional[datetime] = None
     taken_by: Optional[str] = None
+    response_time: Optional[str] = None
+    reactivated_by: Optional[str] = None
+    reactivated_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True
@@ -197,3 +212,9 @@ class PasswordResetConfirm(BaseModel):
     email: EmailStr
     code: str
     new_password: str
+
+class MessageReplyRequest(BaseModel):
+    email: EmailStr
+    subject: str
+    reply_body: str
+    original_message: str

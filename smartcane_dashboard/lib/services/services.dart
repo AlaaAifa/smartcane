@@ -7,3 +7,4 @@ export 'cane_service.dart';
 export 'rental_service.dart';
 export 'dashboard_service.dart';
 export 'subscription_service.dart';
+export 'message_service.dart';

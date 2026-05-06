@@ -42,3 +42,11 @@ def delete_location(location_id: int, db: Session = Depends(get_db)):
     if not deleted:
         raise HTTPException(status_code=404, detail="Location non trouvee")
     return {"message": f"Location {location_id} supprimee avec succes"}
+
+
+@router.get("/by-cane/{sim_de_la_canne}", response_model=schemas.Client)
+def get_user_by_cane(sim_de_la_canne: str, db: Session = Depends(get_db)):
+    user = locations_service.get_user_by_cane_sim(db, sim_de_la_canne)
+    if not user:
+        raise HTTPException(status_code=404, detail="Aucun utilisateur associe a cette canne")
+    return user

@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../theme.dart';
 import '../../services/services.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:convert';
+import 'dart:typed_data';
 
 class StaffPage extends StatefulWidget {
   const StaffPage({super.key});
@@ -154,13 +157,21 @@ class _StaffPageState extends State<StaffPage> {
           Row(
             children: [
               CircleAvatar(
-                backgroundColor: AppTheme.primary,
-                child: Text(
-                  (staff["nom"]?.toString().isNotEmpty ?? false)
-                      ? staff["nom"].toString()[0].toUpperCase()
-                      : "?",
-                  style: const TextStyle(color: Colors.white),
-                ),
+                radius: 24,
+                backgroundColor: AppTheme.primary.withOpacity(0.1),
+                backgroundImage: (staff["photo_url"] != null && staff["photo_url"].toString().startsWith("data:image"))
+                    ? MemoryImage(base64Decode(staff["photo_url"].toString().split(',').last))
+                    : (staff["photo_url"] != null && staff["photo_url"].toString().isNotEmpty)
+                        ? NetworkImage(staff["photo_url"]) as ImageProvider
+                        : null,
+                child: (staff["photo_url"] == null || staff["photo_url"].toString().isEmpty)
+                    ? Text(
+                        (staff["nom"]?.toString().isNotEmpty ?? false)
+                            ? staff["nom"].toString()[0].toUpperCase()
+                            : "?",
+                        style: const TextStyle(color: AppTheme.primary, fontWeight: FontWeight.bold),
+                      )
+                    : null,
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -214,6 +225,7 @@ class _StaffPageState extends State<StaffPage> {
     final phone = TextEditingController(text: _normalizePhoneDigits(staff['numero_de_telephone']?.toString() ?? ""));
     final address = TextEditingController(text: staff['adresse']?.toString() ?? "");
     final password = TextEditingController();
+    String? photoUrl = staff['photo_url']?.toString();
     
     String rawShift = staff['shift']?.toString() ?? "Journée";
     String shift = "Journée";
@@ -230,6 +242,8 @@ class _StaffPageState extends State<StaffPage> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
+                _buildPhotoPicker(context, setDialogState, photoUrl, (newUrl) => photoUrl = newUrl),
+                const SizedBox(height: 16),
                 _buildField("Nom", name, Icons.person),
                 _buildField("Email", email, Icons.email),
                 _buildField("Âge", age, Icons.cake, isNumber: true),
@@ -262,6 +276,7 @@ class _StaffPageState extends State<StaffPage> {
                   "address": address.text,
                   "password": password.text,
                   "shift": shift,
+                  "photo_url": photoUrl,
                 };
                 final res = await StaffService.updateStaff(updated);
                 if (!mounted) return;
@@ -293,6 +308,7 @@ class _StaffPageState extends State<StaffPage> {
     final phone = TextEditingController();
     final address = TextEditingController();
     String shift = "Journée";
+    String? photoUrl;
 
     showDialog(
       context: context,
@@ -303,6 +319,8 @@ class _StaffPageState extends State<StaffPage> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
+                _buildPhotoPicker(context, setDialogState, photoUrl, (newUrl) => photoUrl = newUrl),
+                const SizedBox(height: 16),
                 _buildField("CIN", cin, Icons.fingerprint),
                 _buildField("Nom", name, Icons.person),
                 _buildField("Email", email, Icons.email),
@@ -336,6 +354,7 @@ class _StaffPageState extends State<StaffPage> {
                   "phone": _formatPhoneForBackend(phone.text),
                   "address": address.text,
                   "shift": shift,
+                  "photo_url": photoUrl,
                 };
                 final res = await StaffService.addStaff(newStaff);
                 if (!mounted) return;
@@ -419,6 +438,58 @@ class _StaffPageState extends State<StaffPage> {
           hintText: isPhone ? '12 345 678' : null,
         ),
       ),
+    );
+  }
+
+  Widget _buildPhotoPicker(BuildContext context, StateSetter setDialogState, String? currentUrl, Function(String?) onSelected) {
+    return Column(
+      children: [
+        GestureDetector(
+          onTap: () async {
+            final picker = ImagePicker();
+            final XFile? image = await picker.pickImage(source: ImageSource.gallery, maxWidth: 500, maxHeight: 500, imageQuality: 80);
+            
+            if (image != null) {
+              final bytes = await image.readAsBytes();
+              final base64Image = "data:image/png;base64,${base64Encode(bytes)}";
+              setDialogState(() {
+                onSelected(base64Image);
+              });
+            }
+          },
+          child: Stack(
+            children: [
+              CircleAvatar(
+                radius: 50,
+                backgroundColor: AppTheme.primary.withOpacity(0.1),
+                backgroundImage: (currentUrl != null && currentUrl.startsWith("data:image"))
+                    ? MemoryImage(base64Decode(currentUrl.split(',').last))
+                    : (currentUrl != null && currentUrl.isNotEmpty)
+                        ? NetworkImage(currentUrl) as ImageProvider
+                        : null,
+                child: (currentUrl == null || currentUrl.isEmpty)
+                    ? const Icon(Icons.add_a_photo, size: 30, color: AppTheme.primary)
+                    : null,
+              ),
+              if (currentUrl != null && currentUrl.isNotEmpty)
+                Positioned(
+                  right: 0,
+                  bottom: 0,
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: const BoxDecoration(color: AppTheme.primary, shape: BoxShape.circle),
+                    child: const Icon(Icons.edit, size: 14, color: Colors.white),
+                  ),
+                ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          currentUrl == null ? "Cliquez pour ajouter une photo" : "Changer la photo",
+          style: TextStyle(fontSize: 12, color: Colors.grey.shade600, fontWeight: FontWeight.bold),
+        ),
+      ],
     );
   }
 }

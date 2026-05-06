@@ -28,6 +28,7 @@ class StaffService {
         "password_login": staff["password"],
         "role": "staff",
         "shift": staff["shift"] ?? "Journée",
+        "photo_url": staff["photo_url"],
       }));
       if (res.statusCode == 201) return {"success": true};
       final body = jsonDecode(res.body);
@@ -52,6 +53,7 @@ class StaffService {
           if (staff["password"] != null && staff["password"].toString().isNotEmpty) "password_login": staff["password"],
           "role": "staff",
           if (staff["shift"] != null) "shift": staff["shift"],
+          if (staff["photo_url"] != null) "photo_url": staff["photo_url"],
         }),
       );
       if (res.statusCode == 200) return {"success": true};

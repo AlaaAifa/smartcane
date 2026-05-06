@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter_map/flutter_map.dart';
-import 'package:latlong2/latlong.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../theme.dart';
 import '../../services/services.dart';
 
@@ -56,82 +55,158 @@ class _MapPageState extends State<MapPage> {
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) return const Center(child: CircularProgressIndicator());
-
     final alertColor = widget.alertType == "SOS" ? AppTheme.sosRed : AppTheme.helpOrange;
-    final initialLocation = LatLng(widget.latitude, widget.longitude);
+    final initialCameraPosition = CameraPosition(
+      target: LatLng(widget.latitude, widget.longitude),
+      zoom: 15,
+    );
 
-    return Padding(
-      padding: const EdgeInsets.all(32),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
+    return StreamBuilder<List<Map<String, dynamic>>>(
+      stream: AlertService.getAlertsStream(),
+      builder: (context, snapshot) {
+        final alerts = snapshot.data ?? [];
+        
+        // Create markers for all active alerts
+        final Set<Marker> markers = alerts.map((alert) {
+          final lat = double.tryParse(alert['latitude']?.toString() ?? "") ?? widget.latitude;
+          final lon = double.tryParse(alert['longitude']?.toString() ?? "") ?? widget.longitude;
+          final alertId = alert['alert_id']?.toString() ?? "unknown";
+          final type = alert['type']?.toString() ?? "SOS";
+          final caneStatus = alert['cane_status']?.toString() ?? "normal";
+          
+          return Marker(
+            markerId: MarkerId(alertId),
+            position: LatLng(lat, lon),
+            infoWindow: InfoWindow(
+              title: "Alerte $type - $caneStatus",
+              snippet: "Utilisateur: ${alert['user_id']}",
+            ),
+            icon: BitmapDescriptor.defaultMarkerWithHue(
+              type == "SOS" ? BitmapDescriptor.hueRed : BitmapDescriptor.hueOrange,
+            ),
+          );
+        }).toSet();
+
+        return Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              IconButton(
-                icon: const Icon(Icons.arrow_back),
-                onPressed: () => widget.onBack(),
-              ),
-              const SizedBox(width: 8),
-              const Text("Suivi Temps Réel", style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900)),
-              const SizedBox(width: 16),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                decoration: BoxDecoration(color: alertColor.withOpacity(0.1), borderRadius: BorderRadius.circular(20)),
-                child: Text("Alerte: ${widget.alertType}", style: TextStyle(color: alertColor, fontWeight: FontWeight.w800)),
-              ),
-              const Spacer(),
-              Text("Mise à jour toutes les 10s", style: TextStyle(color: Colors.grey.shade500, fontSize: 12)),
-            ],
-          ),
-          const SizedBox(height: 20),
-
-          Expanded(
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(20),
-              child: FlutterMap(
-                options: MapOptions(initialCenter: initialLocation, initialZoom: 15),
+              Row(
                 children: [
-                  TileLayer(urlTemplate: "https://tile.openstreetmap.org/{z}/{x}/{y}.png"),
-                  MarkerLayer(
-                    markers: _users
-                      .map((user) {
-                        final lat = user['latitude'] ?? widget.latitude;
-                        final lon = user['longitude'] ?? widget.longitude;
-                        final Color markerColor = AppTheme.primary;
-
-                      return Marker(
-                        point: LatLng(lat, lon),
-                        width: 100,
-                        height: 100,
-                        child: Column(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(4),
-                              decoration: BoxDecoration(
-                                color: markerColor,
-                                shape: BoxShape.circle,
-                                border: Border.all(color: Colors.white, width: 2),
-                                boxShadow: [BoxShadow(color: markerColor.withOpacity(0.4), blurRadius: 8, spreadRadius: 2)],
-                              ),
-                              child: const Icon(Icons.person, color: Colors.white, size: 16),
-                            ),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                              decoration: BoxDecoration(color: Colors.black87, borderRadius: BorderRadius.circular(4)),
-                              child: Text(
-                                user['nom']?.toString() ?? "",
-                                style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                    }).toList(),
+                  IconButton(
+                    icon: const Icon(Icons.arrow_back),
+                    onPressed: () => widget.onBack(),
                   ),
+                  const SizedBox(width: 8),
+                  const Text("Suivi Temps Réel", style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900)),
+                  const SizedBox(width: 16),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                    decoration: BoxDecoration(color: alertColor.withOpacity(0.1), borderRadius: BorderRadius.circular(20)),
+                    child: Text("Alerte: ${widget.alertType}", style: TextStyle(color: alertColor, fontWeight: FontWeight.w800)),
+                  ),
+                  const Spacer(),
+                  if (snapshot.connectionState == ConnectionState.waiting)
+                    const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)),
+                  Text("Live Firebase Connected", style: TextStyle(color: Colors.green.shade600, fontSize: 12, fontWeight: FontWeight.bold)),
                 ],
               ),
+              const SizedBox(height: 20),
+              Expanded(
+                child: snapshot.hasError
+                    ? Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(Icons.cloud_off, color: Colors.red, size: 64),
+                            const SizedBox(height: 16),
+                            const Text("Firebase non configuré", style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                            const SizedBox(height: 8),
+                            const Text("Veuillez configurer Firebase pour activer le suivi temps réel."),
+                          ],
+                        ),
+                      )
+                    : Stack(
+                        children: [
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(20),
+                            child: GoogleMap(
+                              initialCameraPosition: initialCameraPosition,
+                              markers: markers,
+                              mapType: MapType.normal,
+                              myLocationEnabled: true,
+                              myLocationButtonEnabled: true,
+                              zoomControlsEnabled: true,
+                            ),
+                          ),
+                          if (alerts.isNotEmpty)
+                            Positioned(
+                              bottom: 20,
+                              left: 20,
+                              right: 20,
+                              child: _buildTrackingPanel(alerts.first),
+                            ),
+                        ],
+                      ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildTrackingPanel(Map<String, dynamic> alert) {
+    final isSOS = alert['type'] == 'SOS';
+    final color = isSOS ? AppTheme.sosRed : AppTheme.helpOrange;
+    
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 20, spreadRadius: 5)],
+      ),
+      child: Row(
+        children: [
+          CircleAvatar(
+            backgroundColor: color.withOpacity(0.1),
+            radius: 25,
+            child: Icon(isSOS ? Icons.emergency : Icons.help_outline, color: color, size: 30),
+          ),
+          const SizedBox(width: 20),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  "SUIVI EN DIRECT: ${alert['type']}",
+                  style: TextStyle(color: color, fontWeight: FontWeight.w900, fontSize: 12),
+                ),
+                Text(
+                  "Client: ${alert['user_id']}",
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                ),
+                Text(
+                  "État: ${alert['cane_status']?.toString().toUpperCase() ?? 'NORMAL'}",
+                  style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+                ),
+              ],
             ),
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              const Text("Signal GPS", style: TextStyle(fontSize: 10, color: Colors.grey)),
+              Row(
+                children: [
+                  const Icon(Icons.gps_fixed, size: 14, color: Colors.green),
+                  const SizedBox(width: 4),
+                  Text("${alert['latitude']}, ${alert['longitude']}", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                ],
+              ),
+            ],
           ),
         ],
       ),

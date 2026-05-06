@@ -19,16 +19,6 @@ document.addEventListener('DOMContentLoaded', () => {
         observer.observe(el);
     });
 
-    // Form submission handling
-    const contactForm = document.querySelector('form');
-    if (contactForm) {
-        contactForm.addEventListener('submit', (e) => {
-            e.preventDefault();
-            alert('Merci pour votre message ! Notre équipe reviendra vers vous très prochainement.');
-            contactForm.reset();
-        });
-    }
-
     // Navbar scroll effect
     const navbar = document.querySelector('nav');
     window.addEventListener('scroll', () => {

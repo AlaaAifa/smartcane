@@ -55,3 +55,24 @@ def delete_location(db: Session, location_id: int):
     db.delete(db_location)
     db.commit()
     return True
+
+
+def get_user_by_cane_sim(db: Session, sim_de_la_canne: str):
+    """
+    Retourne l'utilisateur associé à une canne spécifique via la table location.
+    On tente de chercher avec et sans le préfixe '+' pour plus de flexibilité.
+    """
+    # Nettoyer la valeur de recherche
+    cleaned_sim = sim_de_la_canne.strip()
+    if cleaned_sim.startswith("+"):
+        search_values = [cleaned_sim, cleaned_sim[1:]]
+    else:
+        search_values = [cleaned_sim, f"+{cleaned_sim}"]
+
+    location = db.query(models.Location).filter(
+        models.Location.sim_de_la_canne.in_(search_values)
+    ).order_by(models.Location.id.desc()).first()
+    
+    if location:
+        return location.utilisateur
+    return None

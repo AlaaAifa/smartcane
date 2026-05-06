@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../theme.dart';
 import '../../services/services.dart';
+import '../../models/message_model.dart';
+import 'dart:convert';
 
 class TopNavbar extends StatelessWidget {
   final String currentRoute;
@@ -75,7 +77,16 @@ class TopNavbar extends StatelessWidget {
                       if (BaseService.isAdmin)
                         _buildNavItem("Staff", Icons.badge_rounded, "/staff", isNarrow),
                       _buildNavItem("Gestion Location", Icons.shopping_cart_rounded, "/rentals", isNarrow),
-                      _buildNavItem("Enregistrement Ventes", Icons.person_add_alt_1_rounded, "/add-user", isNarrow),
+                      _buildNavItem("Gestion Vente", Icons.person_add_alt_1_rounded, "/add-user", isNarrow),
+                      StreamBuilder<List<ClientMessage>>(
+                        stream: MessageService.getMessagesStream(),
+                        builder: (context, snapshot) {
+                          final int unreadCount = (snapshot.data ?? [])
+                              .where((m) => m.status == MessageStatus.unread)
+                              .length;
+                          return _buildNavItem("Client Messages", Icons.email_rounded, "/messages", isNarrow, badgeCount: unreadCount);
+                        }
+                      ),
                     ],
                   ),
                 ),
@@ -111,16 +122,23 @@ class TopNavbar extends StatelessWidget {
                     ),
                   const SizedBox(width: 12),
                   CircleAvatar(
-                    backgroundColor: AppTheme.primary,
                     radius: 18,
-                    child: Text(
-                      (BaseService.staffName ?? "?")[0].toUpperCase(),
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                      ),
-                    ),
+                    backgroundColor: AppTheme.primary.withOpacity(0.1),
+                    backgroundImage: (BaseService.staffPhotoUrl != null && BaseService.staffPhotoUrl!.startsWith("data:image"))
+                        ? MemoryImage(base64Decode(BaseService.staffPhotoUrl!.split(',').last))
+                        : (BaseService.staffPhotoUrl != null && BaseService.staffPhotoUrl!.isNotEmpty)
+                            ? NetworkImage(BaseService.staffPhotoUrl!) as ImageProvider
+                            : null,
+                    child: (BaseService.staffPhotoUrl == null || BaseService.staffPhotoUrl!.isEmpty)
+                        ? Text(
+                            (BaseService.staffName ?? "?")[0].toUpperCase(),
+                            style: const TextStyle(
+                              color: AppTheme.primary,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                            ),
+                          )
+                        : null,
                   ),
                   const SizedBox(width: 4),
                   IconButton(
@@ -140,7 +158,7 @@ class TopNavbar extends StatelessWidget {
     );
   }
 
-  Widget _buildNavItem(String label, IconData icon, String route, bool hideLabel) {
+  Widget _buildNavItem(String label, IconData icon, String route, bool hideLabel, {int badgeCount = 0}) {
     final isActive = currentRoute == route;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 6),
@@ -155,10 +173,40 @@ class TopNavbar extends StatelessWidget {
           ),
           child: Row(
             children: [
-              Icon(
-                icon,
-                color: isActive ? Colors.white : Colors.white54,
-                size: 20,
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Icon(
+                    icon,
+                    color: isActive ? Colors.white : Colors.white54,
+                    size: 20,
+                  ),
+                  if (badgeCount > 0)
+                    Positioned(
+                      right: -5,
+                      top: -5,
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: const BoxDecoration(
+                          color: AppTheme.sosRed,
+                          shape: BoxShape.circle,
+                        ),
+                        constraints: const BoxConstraints(
+                          minWidth: 14,
+                          minHeight: 14,
+                        ),
+                        child: Text(
+                          badgeCount.toString(),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 8,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ),
+                ],
               ),
               if (!hideLabel) ...[
                 const SizedBox(width: 10),

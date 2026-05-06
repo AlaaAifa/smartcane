@@ -144,7 +144,7 @@ class _AddUserPageState extends State<AddUserPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              "BOUTIQUE SMART CANE",
+              "GESTION VENTE",
               style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: Colors.black87),
             ),
             Text(
@@ -457,7 +457,7 @@ class _AddUserPageState extends State<AddUserPage> {
           icon: _isLoading 
             ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
             : Icon(_currentStep == 7 ? Icons.check_circle : Icons.arrow_forward),
-          label: Text(_currentStep == 7 ? (_isLoading ? "ENREGISTREMENT..." : "ENREGISTRER LA VENTE") : "SUIVANT"),
+          label: Text(_currentStep == 7 ? (_isLoading ? "VALIDATION..." : "VALIDER LA VENTE") : "SUIVANT"),
           style: ElevatedButton.styleFrom(
             backgroundColor: AppTheme.primary,
             foregroundColor: Colors.white,
@@ -1141,7 +1141,7 @@ class _AddUserPageState extends State<AddUserPage> {
     }
     
     // Safety check for critical fields
-    if (_cinController.text.isEmpty || _fullNameController.text.isEmpty || _simNumberController.text.isEmpty) {
+    if (_cinController.text.trim().isEmpty || _fullNameController.text.trim().isEmpty || _simNumberController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("CIN, Nom et SIM sont obligatoires."), backgroundColor: AppTheme.sosRed));
       return;
     }
@@ -1149,9 +1149,10 @@ class _AddUserPageState extends State<AddUserPage> {
     setState(() => _isLoading = true);
 
     try {
+      final String cin = _cinController.text.trim();
       final String email = _emailController.text.trim().isNotEmpty 
           ? _emailController.text.trim() 
-          : "${_cinController.text.trim()}@smartcane.com";
+          : "$cin@smartcane.com";
 
       // Format address properly for backend (String)
       String formattedAddress = "${_streetController.text.trim()}, ${_cityController.text.trim()} ${_postalCodeController.text.trim()}, ${_countryController.text.trim()}".trim();
@@ -1167,35 +1168,42 @@ class _AddUserPageState extends State<AddUserPage> {
       };
       final String medicalJson = jsonEncode(medicalInfo);
 
-      final flatUserData = {
-        "cin": _cinController.text.trim(),
-        "nom": _fullNameController.text.trim(),
-        "email": email,
-        "age": _calculatedAge ?? 0,
-        "adresse": formattedAddress,
-        "numero_de_telephone": _formatPhoneForBackend(_phoneController.text.trim()),
-        "contact_familial": _formatPhoneForBackend(_emergencyPhoneController.text.trim()),
-        "etat_de_sante": medicalJson,
-        "sim_de_la_canne": _formatPhoneForBackend(_simNumberController.text.trim()),
-        "role": "client",
-      };
-
-      // 1. Try to Add User
-      final resAdd = await UserService.addUser(flatUserData);
-      bool userSuccess = resAdd["success"];
-      String? errorMessage = resAdd["error"];
+      // Check if user already exists
+      final existingUser = await UserService.getUserByCin(cin);
       
-      // 2. If User exists (400) or fails, try Update as fallback
-      if (!userSuccess) {
-        final resUpdate = await UserService.updateUser(_cinController.text.trim(), {
+      bool userSuccess = false;
+      String? errorMessage;
+
+      if (existingUser != null) {
+        // User exists -> Update
+        final resUpdate = await UserService.updateUser(cin, {
           "nom": _fullNameController.text.trim(),
           "adresse": formattedAddress,
+          "email": email,
+          "age": _calculatedAge ?? 0,
           "numero_de_telephone": _formatPhoneForBackend(_phoneController.text.trim()),
+          "contact_familial": _formatPhoneForBackend(_emergencyPhoneController.text.trim()),
           "sim_de_la_canne": _formatPhoneForBackend(_simNumberController.text.trim()),
           "etat_de_sante": medicalJson,
         });
         userSuccess = resUpdate["success"];
         errorMessage = resUpdate["error"];
+      } else {
+        // User doesn't exist -> Create
+        final resAdd = await UserService.addUser({
+          "cin": cin,
+          "nom": _fullNameController.text.trim(),
+          "email": email,
+          "age": _calculatedAge ?? 0,
+          "adresse": formattedAddress,
+          "numero_de_telephone": _formatPhoneForBackend(_phoneController.text.trim()),
+          "contact_familial": _formatPhoneForBackend(_emergencyPhoneController.text.trim()),
+          "etat_de_sante": medicalJson,
+          "sim_de_la_canne": _formatPhoneForBackend(_simNumberController.text.trim()),
+          "role": "client",
+        });
+        userSuccess = resAdd["success"];
+        errorMessage = resAdd["error"];
       }
 
       if (userSuccess) {
@@ -1209,7 +1217,7 @@ class _AddUserPageState extends State<AddUserPage> {
         // 4. Create Abonnement record for Sales
         await SubscriptionService.createSubscription({
           "sim_de_la_canne": _formatPhoneForBackend(_simNumberController.text.trim()),
-          "cin_utilisateur": _cinController.text.trim(),
+          "cin_utilisateur": cin,
           "type_d_abonnement": _selectedCaneVersion.contains("Lite") ? "essential" : "premium",
           "date_de_fin": "${_subEndDate.year}-${_subEndDate.month.toString().padLeft(2, '0')}-${_subEndDate.day.toString().padLeft(2, '0')}",
         });
@@ -1222,7 +1230,11 @@ class _AddUserPageState extends State<AddUserPage> {
         if (mounted) {
           setState(() => _isLoading = false);
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text("ERREUR: $errorMessage"), backgroundColor: AppTheme.sosRed),
+            SnackBar(
+              content: Text("ERREUR: ${errorMessage ?? 'Une erreur est survenue'}"), 
+              backgroundColor: AppTheme.sosRed,
+              duration: const Duration(seconds: 5),
+            ),
           );
         }
       }

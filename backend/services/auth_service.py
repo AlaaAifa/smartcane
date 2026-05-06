@@ -52,8 +52,10 @@ async def request_password_reset(db: Session, email: str) -> Tuple[bool, str]:
     if db_reset_code:
         db_reset_code.code = otp
         db_reset_code.expires_at = expires_at
+        db_reset_code.created_at = datetime.datetime.utcnow()
+        db_reset_code.is_used = False
     else:
-        db_reset_code = models.ResetCode(email=email, code=otp, expires_at=expires_at)
+        db_reset_code = models.ResetCode(email=email, code=otp, expires_at=expires_at, created_at=datetime.datetime.utcnow(), is_used=False)
         db.add(db_reset_code)
     
     db.commit()
@@ -72,6 +74,9 @@ def verify_otp(db: Session, email: str, code: str) -> Tuple[bool, str]:
     
     if not db_reset_code:
         return False, "Aucun code demandé pour cet email"
+        
+    if db_reset_code.is_used:
+        return False, "Le code a déjà été utilisé"
     
     if db_reset_code.is_expired():
         return False, "Le code a expiré"
@@ -107,7 +112,10 @@ def reset_password(db: Session, email: str, code: str, new_password: str) -> Tup
     else:
         user.password_login = hashed_password
     
-    db.delete(db.query(models.ResetCode).filter(models.ResetCode.email == email).first())
+    db_reset_code = db.query(models.ResetCode).filter(models.ResetCode.email == email).first()
+    if db_reset_code:
+        db_reset_code.is_used = True
+        
     db.commit()
     
     return True, "Mot de passe réinitialisé avec succès"

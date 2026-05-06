@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'views/theme.dart';
 import 'services/services.dart';
 import 'views/layout/top_navbar.dart';
@@ -12,8 +13,30 @@ import 'views/map/map_page.dart';
 import 'views/admin/solved_alerts_page.dart';
 import 'views/staff/staff_page.dart';
 import 'views/rentals/cane_rentals_page.dart';
+import 'views/messages/messages_page.dart';
 
-void main() {
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  
+  try {
+    await Firebase.initializeApp(
+      options: const FirebaseOptions(
+        apiKey: "AIzaSyCyQF1n2S7CYyzqlacSetIXv7_8KZ04hGQ",
+authDomain: "smartcane-97717.firebaseapp.com",
+databaseURL: "https://smartcane-97717-default-rtdb.europe-west1.firebasedatabase.app",
+projectId: "smartcane-97717",
+storageBucket: "smartcane-97717.firebasestorage.app",
+messagingSenderId: "178098479712",
+appId: "1:178098479712:web:5121de6088c7e848f89905",
+measurementId: "G-N56QLD2K56"
+      ),
+    );
+    print("DEBUG: Firebase s'est connecté avec succès !");
+  } catch (e) {
+    print("DEBUG: Erreur critique d'initialisation Firebase: $e");
+  }
+
   runApp(const SmartCaneDashboard());
 }
 
@@ -102,6 +125,9 @@ class _AppNavigatorState extends State<AppNavigator> {
         );
       case "/solved":
         return const SolvedAlertsPage();
+      case "/messages":
+        return const MessagesPage();
+
 
       default:
         return DashboardPage(onNavigate: _navigate);
