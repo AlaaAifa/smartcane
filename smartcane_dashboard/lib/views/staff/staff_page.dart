@@ -143,6 +143,7 @@ class _StaffPageState extends State<StaffPage> {
   Widget _buildStaffCard(Map<String, dynamic> staff) {
     final cin = staff["cin"]?.toString() ?? "";
     final perf = Map<String, dynamic>.from(performanceData[cin] ?? {});
+    final bool isAdminRole = staff["role"] == "admin";
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -178,7 +179,19 @@ class _StaffPageState extends State<StaffPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(staff["nom"]?.toString() ?? "", style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+                    Row(
+                      children: [
+                        Text(staff["nom"]?.toString() ?? "", style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+                        if (isAdminRole) ...[
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(color: AppTheme.primary.withOpacity(0.1), borderRadius: BorderRadius.circular(4)),
+                            child: const Text("ADMIN", style: TextStyle(color: AppTheme.primary, fontSize: 8, fontWeight: FontWeight.bold)),
+                          ),
+                        ],
+                      ],
+                    ),
                     Row(
                       children: [
                         Text("${staff["age"] ?? "0"} ans", style: TextStyle(color: AppTheme.primary, fontSize: 11, fontWeight: FontWeight.bold)),
@@ -190,9 +203,20 @@ class _StaffPageState extends State<StaffPage> {
                 ),
               ),
               if (BaseService.isAdmin)
-                IconButton(
-                  icon: const Icon(Icons.edit_outlined, color: AppTheme.primary, size: 20),
-                  onPressed: () => _showEditStaffDialog(context, staff),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.edit_outlined, color: AppTheme.primary, size: 20),
+                      onPressed: () => _showEditStaffDialog(context, staff),
+                      tooltip: "Modifier",
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.delete_outline_rounded, color: AppTheme.sosRed, size: 20),
+                      onPressed: () => _deleteStaff(staff),
+                      tooltip: "Supprimer",
+                    ),
+                  ],
                 ),
             ],
           ),
@@ -207,6 +231,53 @@ class _StaffPageState extends State<StaffPage> {
         ],
       ),
     );
+  }
+
+  void _deleteStaff(Map<String, dynamic> staff) async {
+    final cin = staff["cin"]?.toString() ?? "";
+    final name = staff["nom"]?.toString() ?? "ce membre";
+
+    final bool? confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: AppTheme.sosRed),
+            SizedBox(width: 12),
+            Text("Confirmer la suppression"),
+          ],
+        ),
+        content: Text("Êtes-vous sûr de vouloir supprimer $name (CIN: $cin) ? Cette action est irréversible."),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text("ANNULER", style: TextStyle(color: Colors.grey.shade600)),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.sosRed),
+            child: const Text("SUPPRIMER"),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      final res = await StaffService.deleteStaff(cin);
+      if (!mounted) return;
+
+      if (res["success"] == true) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Membre $name supprimé avec succès"), backgroundColor: AppTheme.normalGreen),
+        );
+        _loadData();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(res["error"] ?? "Erreur lors de la suppression"), backgroundColor: AppTheme.sosRed),
+        );
+      }
+    }
   }
 
   Widget _statItem(String label, String value, Color color) {
@@ -232,6 +303,8 @@ class _StaffPageState extends State<StaffPage> {
     if (rawShift == "Nuit" || rawShift == "soir") {
       shift = "Nuit";
     }
+    
+    String role = staff['role']?.toString() ?? "staff";
 
     showDialog(
       context: context,
@@ -251,14 +324,32 @@ class _StaffPageState extends State<StaffPage> {
                 _buildField("Adresse", address, Icons.home),
                 _buildField("Nouveau mot de passe", password, Icons.lock, obscure: true),
                 const SizedBox(height: 12),
-                DropdownButtonFormField<String>(
-                  value: shift,
-                  decoration: const InputDecoration(labelText: "Shift", prefixIcon: Icon(Icons.access_time)),
-                  items: const [
-                    DropdownMenuItem(value: "Journée", child: Text("Journée")),
-                    DropdownMenuItem(value: "Nuit", child: Text("Nuit")),
+                Row(
+                  children: [
+                    Expanded(
+                      child: DropdownButtonFormField<String>(
+                        value: shift,
+                        decoration: const InputDecoration(labelText: "Shift", prefixIcon: Icon(Icons.access_time)),
+                        items: const [
+                          DropdownMenuItem(value: "Journée", child: Text("Journée")),
+                          DropdownMenuItem(value: "Nuit", child: Text("Nuit")),
+                        ],
+                        onChanged: (val) => setDialogState(() => shift = val ?? "Journée"),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: DropdownButtonFormField<String>(
+                        value: role,
+                        decoration: const InputDecoration(labelText: "Rôle", prefixIcon: Icon(Icons.admin_panel_settings_outlined)),
+                        items: const [
+                          DropdownMenuItem(value: "staff", child: Text("Staff Normal")),
+                          DropdownMenuItem(value: "admin", child: Text("Admin")),
+                        ],
+                        onChanged: (val) => setDialogState(() => role = val ?? "staff"),
+                      ),
+                    ),
                   ],
-                  onChanged: (val) => setDialogState(() => shift = val ?? "Journée"),
                 ),
               ],
             ),
@@ -276,6 +367,7 @@ class _StaffPageState extends State<StaffPage> {
                   "address": address.text,
                   "password": password.text,
                   "shift": shift,
+                  "role": role,
                   "photo_url": photoUrl,
                 };
                 final res = await StaffService.updateStaff(updated);
@@ -308,6 +400,7 @@ class _StaffPageState extends State<StaffPage> {
     final phone = TextEditingController();
     final address = TextEditingController();
     String shift = "Journée";
+    String role = "staff";
     String? photoUrl;
 
     showDialog(
@@ -329,14 +422,32 @@ class _StaffPageState extends State<StaffPage> {
                 _buildField("Téléphone", phone, Icons.phone, isPhone: true),
                 _buildField("Adresse", address, Icons.home),
                 const SizedBox(height: 12),
-                DropdownButtonFormField<String>(
-                  value: shift,
-                  decoration: const InputDecoration(labelText: "Shift", prefixIcon: Icon(Icons.access_time)),
-                  items: const [
-                    DropdownMenuItem(value: "Journée", child: Text("Journée")),
-                    DropdownMenuItem(value: "Nuit", child: Text("Nuit")),
+                Row(
+                  children: [
+                    Expanded(
+                      child: DropdownButtonFormField<String>(
+                        value: shift,
+                        decoration: const InputDecoration(labelText: "Shift", prefixIcon: Icon(Icons.access_time)),
+                        items: const [
+                          DropdownMenuItem(value: "Journée", child: Text("Journée")),
+                          DropdownMenuItem(value: "Nuit", child: Text("Nuit")),
+                        ],
+                        onChanged: (val) => setDialogState(() => shift = val ?? "Journée"),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: DropdownButtonFormField<String>(
+                        value: role,
+                        decoration: const InputDecoration(labelText: "Rôle", prefixIcon: Icon(Icons.admin_panel_settings_outlined)),
+                        items: const [
+                          DropdownMenuItem(value: "staff", child: Text("Staff Normal")),
+                          DropdownMenuItem(value: "admin", child: Text("Admin")),
+                        ],
+                        onChanged: (val) => setDialogState(() => role = val ?? "staff"),
+                      ),
+                    ),
                   ],
-                  onChanged: (val) => setDialogState(() => shift = val ?? "Journée"),
                 ),
               ],
             ),
@@ -354,6 +465,7 @@ class _StaffPageState extends State<StaffPage> {
                   "phone": _formatPhoneForBackend(phone.text),
                   "address": address.text,
                   "shift": shift,
+                  "role": role,
                   "photo_url": photoUrl,
                 };
                 final res = await StaffService.addStaff(newStaff);

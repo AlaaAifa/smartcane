@@ -1,10 +1,24 @@
 import 'dart:convert';
+import 'dart:async';
  import 'package:http/http.dart' as http;
 import 'package:firebase_database/firebase_database.dart';
+import 'package:flutter/material.dart';
 import 'base_service.dart';
 import 'user_service.dart';
 
 class AlertService {
+  // Global reference for showing dialogs/snackbars from service if needed
+  static GlobalKey<ScaffoldMessengerState>? scaffoldMessengerKey;
+
+  static void _showError(String message) {
+    print("❌ ALERT SERVICE ERROR: $message");
+    if (scaffoldMessengerKey != null) {
+      scaffoldMessengerKey!.currentState?.showSnackBar(
+        SnackBar(content: Text(message), backgroundColor: Colors.red.shade900),
+      );
+    }
+  }
+
   static Future<List<Map<String, dynamic>>> getActiveAlerts() async {
     try {
       final res = await http.get(Uri.parse("${BaseService.baseUrl}/alerts"), headers: BaseService.headers);
@@ -33,44 +47,104 @@ class AlertService {
 
   static Future<bool> clearAlertHistory() async {
     try {
-      final history = await getAlertsHistory();
-      var success = true;
-      for (final alert in history) {
-        final alertId = alert["alert_id"]?.toString();
-        if (alertId == null) {
-          continue;
-        }
-        success = await deleteAlert(alertId) && success;
+      final res = await http.delete(Uri.parse("${BaseService.baseUrl}/alerts/history/clear"), headers: BaseService.headers);
+      bool backendSuccess = res.statusCode == 200;
+
+      try {
+        await _archiveRef.remove();
+        print("✅ Firebase History cleared");
+      } catch (fbe) {
+        print("❌ Firebase Clear failed: $fbe");
       }
-      return success;
+      
+      return backendSuccess;
     } catch (e) {
       print("Clear history error: $e");
     }
     return false;
   }
 
-  static Future<bool> deleteAlert(String alertId) async {
+  static Future<bool> deleteAlert(String alertId, {String? firebaseKey}) async {
     try {
+      print("DEBUG: Deleting alert $alertId (Firebase Key: $firebaseKey)");
+      
+      // 1. Delete from MySQL
       final res = await http.delete(Uri.parse("${BaseService.baseUrl}/alerts/$alertId"), headers: BaseService.headers);
-      return res.statusCode == 200;
+      bool mysqlSuccess = res.statusCode == 200 || res.statusCode == 404;
+
+      if (!mysqlSuccess) {
+        _showError("Backend Delete Fail: ${res.statusCode} - ${res.body}");
+      }
+
+      // 2. Delete from Firebase (Archive)
+      final targetKey = firebaseKey ?? alertId;
+      try {
+        await _archiveRef.child(targetKey).remove();
+        print("DEBUG: Firebase deletion success for $targetKey");
+      } catch (fbe) {
+        _showError("Firebase Delete Fail: $fbe");
+        return false;
+      }
+
+      return mysqlSuccess;
     } catch (e) {
-      print("Delete alert error: $e");
+      _showError("Delete Critical Error: $e");
     }
     return false;
+  }
+
+  static Future<void> _ensureAlertExistsInMySQL(String alertId, Map<String, dynamic>? fullAlertData) async {
+    if (fullAlertData == null) return;
+    
+    try {
+      print("DEBUG: Checking MySQL for alert $alertId...");
+      final checkRes = await http.get(Uri.parse("${BaseService.baseUrl}/alerts/$alertId"), headers: BaseService.headers);
+      
+      if (checkRes.statusCode == 404) {
+        print("DEBUG: Syncing missing alert $alertId to MySQL...");
+        final createPayload = <String, dynamic>{};
+        
+        createPayload["alert_id"] = alertId;
+        createPayload["type"] = fullAlertData["type"]?.toString() ?? "SOS";
+        createPayload["latitude"] = double.tryParse(fullAlertData["latitude"]?.toString() ?? "0.0") ?? 0.0;
+        createPayload["longitude"] = double.tryParse(fullAlertData["longitude"]?.toString() ?? "0.0") ?? 0.0;
+        createPayload["status"] = fullAlertData["status"]?.toString() ?? "active";
+        createPayload["cane_status"] = fullAlertData["cane_status"]?.toString() ?? "normal";
+        
+        final String? userId = fullAlertData["user_id"]?.toString();
+        if (userId != null && userId != "unknown" && userId != "UNKNOWN" && userId != "null") {
+           createPayload["user_id"] = userId;
+        } else {
+           createPayload["user_id"] = null;
+        }
+
+        final postRes = await http.post(
+          Uri.parse("${BaseService.baseUrl}/alerts"),
+          headers: BaseService.headers,
+          body: jsonEncode(createPayload),
+        );
+        print("DEBUG: MySQL POST result: ${postRes.statusCode} - ${postRes.body}");
+      } else {
+        print("DEBUG: Alert $alertId already in MySQL (Status: ${checkRes.statusCode})");
+      }
+    } catch (e) {
+      print("❌ Sync error: $e");
+    }
   }
 
 
   static Future<bool> resolveAlert(String alertId, {String? firebaseKey, String? startTime, Map<String, dynamic>? fullAlertData}) async {
     try {
-      print("DEBUG: Resolving alert $alertId (Firebase Key: $firebaseKey)");
+      print("DEBUG: resolveAlert START ($alertId)");
       
-      final resolvedAt = DateTime.now();
+      final now = DateTime.now();
+      final String resolvedAtIso = now.toIso8601String();
       String responseTimeStr = "0s";
       
       if (startTime != null) {
         try {
           final start = DateTime.parse(startTime);
-          final diff = resolvedAt.difference(start);
+          final diff = now.difference(start);
           final minutes = diff.inMinutes;
           final seconds = diff.inSeconds % 60;
           responseTimeStr = "${minutes}m ${seconds}s";
@@ -79,100 +153,60 @@ class AlertService {
         }
       }
 
+      await _ensureAlertExistsInMySQL(alertId, fullAlertData);
+
       // 1. Update Backend (MySQL)
       final resolvePayload = {
         "status": "resolved",
         "resolved_by": BaseService.staffName ?? BaseService.staffId ?? "Staff",
-        "resolved_at": resolvedAt.toIso8601String(),
+        "resolved_at": resolvedAtIso,
         "response_time": responseTimeStr,
       };
 
+      print("DEBUG: MySQL PUT /alerts/$alertId with payload: $resolvePayload");
       var res = await http.put(
         Uri.parse("${BaseService.baseUrl}/alerts/$alertId"),
         headers: BaseService.headers,
         body: jsonEncode(resolvePayload),
       );
       
-      bool backendSuccess = res.statusCode == 200;
-
-      // Handle 404: If alert doesn't exist in MySQL, create it as resolved
-      if (res.statusCode == 404 && fullAlertData != null) {
-        print("DEBUG: Alert not in MySQL, creating it as resolved...");
-        final createPayload = Map<String, dynamic>.from(fullAlertData);
-        
-        // --- Integrity Check for Foreign Key ---
-        final users = await UserService.getUsers();
-        final List<String> validCins = users.map((u) => u["cin"]?.toString() ?? "").toList();
-        final String? alertUserId = createPayload["user_id"]?.toString();
-        
-        if (alertUserId == null || !validCins.contains(alertUserId)) {
-          print("⚠️ Warning: User $alertUserId not found in DB. Setting user_id to null for MySQL.");
-          createPayload["user_id"] = null;
-        }
-
-        createPayload["alert_id"] = alertId;
-        createPayload["status"] = "resolved";
-        createPayload["resolved_by"] = BaseService.staffName ?? BaseService.staffId ?? "Staff";
-        createPayload["resolved_at"] = resolvedAt.toIso8601String();
-        createPayload["response_time"] = responseTimeStr;
-        
-        // Remove unwanted fields for POST schema
-        createPayload.remove("firebase_key");
-        createPayload.remove("user_name");
-        createPayload.remove("user_phone");
-        createPayload.remove("user_address");
-        createPayload.remove("health_notes");
-        createPayload.remove("emergency_phone");
-        createPayload.remove("age");
-        createPayload.remove("email");
-        createPayload.remove("timestamp");
-        createPayload.remove("state");
-        createPayload.remove("resolved");
-        createPayload.remove("caneStatus");
-
-        final createRes = await http.post(
-          Uri.parse("${BaseService.baseUrl}/alerts"),
-          headers: BaseService.headers,
-          body: jsonEncode(createPayload),
-        );
-        backendSuccess = createRes.statusCode == 201;
-        if (!backendSuccess) {
-          print("DEBUG: MySQL POST failed: ${createRes.body}");
-        }
+      if (res.statusCode != 200) {
+        _showError("Backend Fail: ${res.statusCode} - ${res.body}");
+        return false;
       }
-
-      if (!backendSuccess) {
-        print("DEBUG: Backend resolve failed: ${res.body}");
-      }
+      print("DEBUG: MySQL Update Success (200)");
 
       // 2. Update Firebase (Realtime)
       final targetKey = firebaseKey ?? alertId;
       try {
-        await _alertsRef.child(targetKey).update({
+        print("DEBUG: Updating Firebase at /alerts/$targetKey...");
+        await _archiveRef.child(targetKey).update({
           "status": "RESOLVED",
           "resolved": true,
-          "resolved_at": resolvedAt.toIso8601String(),
+          "resolved_at": resolvedAtIso,
           "resolved_by": BaseService.staffName ?? "Staff",
           "response_time": responseTimeStr,
         });
         print("DEBUG: Firebase update success for $targetKey");
       } catch (fbe) {
-        print("DEBUG: Firebase update failed: $fbe");
+        _showError("Firebase Fail: $fbe");
+        return false;
       }
       
-      return backendSuccess;
+      return true;
     } catch (e) {
-      print("Resolve error: $e");
+      _showError("Resolve Critical Error: $e");
     }
     return false;
   }
 
-  static Future<bool> reactivateAlert(String alertId, {String? firebaseKey}) async {
+  static Future<bool> reactivateAlert(String alertId, {String? firebaseKey, Map<String, dynamic>? fullAlertData}) async {
     try {
-      print("DEBUG: Reactivating alert $alertId (Firebase Key: $firebaseKey)");
-      final reactivatedAt = DateTime.now();
+      print("DEBUG: Reactivating alert $alertId");
+      final reactivatedAtIso = DateTime.now().toIso8601String();
 
-      // 1. Update Backend (MySQL)
+      await _ensureAlertExistsInMySQL(alertId, fullAlertData);
+
       final res = await http.put(
         Uri.parse("${BaseService.baseUrl}/alerts/$alertId"),
         headers: BaseService.headers,
@@ -182,72 +216,65 @@ class AlertService {
           "resolved_at": null,
           "taken_by": null,
           "reactivated_by": BaseService.staffName ?? BaseService.staffId ?? "Staff",
-          "reactivated_at": reactivatedAt.toIso8601String(),
+          "reactivated_at": reactivatedAtIso,
         }),
       );
       
-      bool backendSuccess = res.statusCode == 200;
-      if (!backendSuccess) {
-        print("DEBUG: Backend reactivate failed: ${res.body}");
+      if (res.statusCode != 200) {
+        _showError("Backend Reactivate Fail: ${res.statusCode}");
+        return false;
       }
 
-      // 2. Update Firebase (Realtime)
       final targetKey = firebaseKey ?? alertId;
       try {
-        await _alertsRef.child(targetKey).update({
+        await _archiveRef.child(targetKey).update({
           "status": "active",
           "resolved": false,
           "resolved_at": null,
           "resolved_by": null,
-          "reactivated_at": reactivatedAt.toIso8601String(),
+          "reactivated_at": reactivatedAtIso,
           "reactivated_by": BaseService.staffName ?? "Staff",
         });
-        print("DEBUG: Firebase reactivation success for $targetKey");
       } catch (fbe) {
-        print("DEBUG: Firebase reactivation failed: $fbe");
+        _showError("Firebase Reactivate Fail: $fbe");
+        return false;
       }
 
-      return backendSuccess;
+      return true;
     } catch (e) {
-      print("Reactivate error: $e");
+      _showError("Reactivate Critical Error: $e");
     }
     return false;
   }
 
-  static Future<bool> takeAlert(String alertId, {String? firebaseKey}) async {
+  static Future<bool> takeAlert(String alertId, {String? firebaseKey, Map<String, dynamic>? fullAlertData}) async {
     try {
-      print("DEBUG: Taking alert $alertId (Firebase Key: $firebaseKey)");
-      
-      // 1. Update Firebase (Primary for Live Alerts)
+      print("DEBUG: takeAlert START ($alertId)");
+      await _ensureAlertExistsInMySQL(alertId, fullAlertData);
+
       final targetKey = firebaseKey ?? alertId;
-      bool firebaseSuccess = false;
       try {
-        await _alertsRef.child(targetKey).update({
+        final ref = (firebaseKey == "active_alert") ? _activeRef : _archiveRef.child(targetKey);
+        await ref.update({
           "taken_by": BaseService.staffId,
           "taken_by_name": BaseService.staffName ?? "Staff",
         });
-        firebaseSuccess = true;
       } catch (fbe) {
-        print("DEBUG: Firebase takeAlert failed: $fbe");
+        print("❌ Firebase takeAlert failed: $fbe");
       }
 
-      // 2. Update Backend (Secondary, ignore 404 for live alerts)
       try {
         final res = await http.put(
           Uri.parse("${BaseService.baseUrl}/alerts/$alertId"),
           headers: BaseService.headers,
-          body: jsonEncode({
-            "taken_by": BaseService.staffId,
-          }),
+          body: jsonEncode({"taken_by": BaseService.staffId}),
         );
-        if (res.statusCode != 200) {
-           print("DEBUG: Backend takeAlert info: ${res.statusCode} - ${res.body}");
-        }
+        print("DEBUG: Backend takeAlert result: ${res.statusCode}");
       } catch (e) {
         print("Backend takeAlert error: $e");
       }
 
-      return firebaseSuccess;
+      return true;
     } catch (e) {
       print("Take error: $e");
     }
@@ -256,38 +283,28 @@ class AlertService {
 
   static Future<bool> releaseAlert(String alertId, {String? firebaseKey}) async {
     try {
-      print("DEBUG: Releasing alert $alertId (Firebase Key: $firebaseKey)");
-
-      // 1. Update Firebase (Primary for Live Alerts)
       final targetKey = firebaseKey ?? alertId;
-      bool firebaseSuccess = false;
       try {
-        await _alertsRef.child(targetKey).update({
+        final ref = (firebaseKey == "active_alert") ? _activeRef : _archiveRef.child(targetKey);
+        await ref.update({
           "taken_by": null,
           "taken_by_name": null,
         });
-        firebaseSuccess = true;
       } catch (fbe) {
-        print("DEBUG: Firebase releaseAlert failed: $fbe");
+        print("❌ Firebase releaseAlert failed: $fbe");
       }
 
-      // 2. Update Backend (Secondary, ignore 404)
       try {
-        final res = await http.put(
+        await http.put(
           Uri.parse("${BaseService.baseUrl}/alerts/$alertId"),
           headers: BaseService.headers,
-          body: jsonEncode({
-            "taken_by": null,
-          }),
+          body: jsonEncode({"taken_by": null}),
         );
-        if (res.statusCode != 200) {
-           print("DEBUG: Backend releaseAlert info: ${res.statusCode} - ${res.body}");
-        }
       } catch (e) {
         print("Backend releaseAlert error: $e");
       }
 
-      return firebaseSuccess;
+      return true;
     } catch (e) {
       print("Release error: $e");
     }
@@ -304,81 +321,157 @@ class AlertService {
     return false;
   }
 
-  // --- Firebase Realtime Database ---
   static DatabaseReference get _activeRef => FirebaseDatabase.instance.ref("smartcane/device1/active_alert");
   static DatabaseReference get _archiveRef => FirebaseDatabase.instance.ref("alerts");
-  static DatabaseReference get _alertsRef => _archiveRef; // Alias pour compatibilité
 
   static Stream<List<Map<String, dynamic>>> getAlertsStream() {
-    print("DEBUG: Listening to active alert at: ${_activeRef.path}");
-    return _activeRef.onValue.map((event) {
+    final controller = StreamController<List<Map<String, dynamic>>>();
+    List<Map<String, dynamic>> lastActive = [];
+    List<Map<String, dynamic>> lastReactivated = [];
+
+    void update() {
+      if (!controller.isClosed) {
+        final combined = [...lastActive, ...lastReactivated];
+        combined.sort((a, b) => (b['timestamp'] ?? "").compareTo(a['timestamp'] ?? ""));
+        controller.add(combined);
+      }
+    }
+
+    final activeSub = _activeRef.onValue.listen((event) {
       final Object? value = event.snapshot.value;
-      
       if (value == null) {
-        print("DEBUG: Aucune alerte active trouvée dans Firebase.");
-        return [];
+        lastActive = [];
+      } else {
+        try {
+          final raw = Map<dynamic, dynamic>.from(value as Map);
+          lastActive = [{
+            'alert_id': raw['id']?.toString() ?? "active",
+            'firebase_key': "active_alert",
+            'user_id': raw['user']?['cin']?.toString() ?? "unknown",
+            'user_name': raw['user']?['name']?.toString() ?? "Inconnu",
+            'user_phone': raw['user']?['phone']?.toString() ?? "",
+            'type': raw['type']?.toString() ?? "SOS",
+            'count': raw['count'] ?? 1,
+            'latitude': double.tryParse(raw['latitude']?.toString() ?? "36.8065") ?? 36.8065,
+            'longitude': double.tryParse(raw['longitude']?.toString() ?? "10.1815") ?? 10.1815,
+            'timestamp': DateTime.fromMillisecondsSinceEpoch(raw['lastUpdatedAt'] ?? DateTime.now().millisecondsSinceEpoch).toIso8601String(),
+            'createdAt': DateTime.fromMillisecondsSinceEpoch(raw['createdAt'] ?? DateTime.now().millisecondsSinceEpoch).toIso8601String(),
+            'status': 'active',
+            'resolved': false,
+            'cane_status': raw['caneStatus']?.toString() ?? "NORMAL",
+            'taken_by': raw['taken_by'],
+            'taken_by_name': raw['taken_by_name'],
+          }];
+        } catch (e) {
+          print("❌ Erreur parsing alerte active: $e");
+          lastActive = [];
+        }
       }
-
-      try {
-        final raw = Map<dynamic, dynamic>.from(value as Map);
-        
-        // Conversion au format attendu par le Dashboard
-        final alert = {
-          'alert_id': raw['id']?.toString() ?? "active",
-          'firebase_key': "active_alert",
-          'user_id': raw['user']?['cin']?.toString() ?? "unknown",
-          'user_name': raw['user']?['name']?.toString() ?? "Inconnu",
-          'user_phone': raw['user']?['phone']?.toString() ?? "",
-          'type': raw['type']?.toString() ?? "SOS",
-          'count': raw['count'] ?? 1,
-          'latitude': double.tryParse(raw['latitude']?.toString() ?? "36.8065") ?? 36.8065,
-          'longitude': double.tryParse(raw['longitude']?.toString() ?? "10.1815") ?? 10.1815,
-          'timestamp': DateTime.fromMillisecondsSinceEpoch(raw['lastUpdatedAt'] ?? DateTime.now().millisecondsSinceEpoch).toIso8601String(),
-          'createdAt': DateTime.fromMillisecondsSinceEpoch(raw['createdAt'] ?? DateTime.now().millisecondsSinceEpoch).toIso8601String(),
-          'status': 'active',
-          'resolved': false,
-          'cane_status': raw['caneStatus']?.toString() ?? "NORMAL",
-        };
-
-        return [alert];
-      } catch (e) {
-        print("❌ Erreur parsing alerte active: $e");
-        return [];
-      }
+      update();
     });
+
+    final archiveSub = _archiveRef.onValue.listen((event) {
+      final Object? value = event.snapshot.value;
+      if (value == null) {
+        lastReactivated = [];
+      } else {
+        final List<Map<String, dynamic>> reactivatedList = [];
+        final Map<dynamic, dynamic> dataMap = {};
+
+        if (value is Map) dataMap.addAll(value);
+        else if (value is List) {
+          for (int i = 0; i < value.length; i++) {
+            if (value[i] != null) dataMap[i.toString()] = value[i];
+          }
+        }
+
+        dataMap.forEach((key, val) {
+          if (val is Map) {
+            final raw = Map<dynamic, dynamic>.from(val);
+            if (raw['status'] == 'active' || raw['resolved'] == false || raw['resolved']?.toString() == 'false') {
+              final userMap = raw['user'];
+              String userName = "Inconnu";
+              if (userMap is Map) userName = userMap['name']?.toString() ?? "Inconnu";
+
+              reactivatedList.add({
+                'alert_id': raw['alert_id']?.toString() ?? key.toString(),
+                'firebase_key': key.toString(),
+                'user_id': raw['user_id']?.toString() ?? raw['user']?['cin']?.toString() ?? "unknown",
+                'user_name': userName,
+                'type': raw['type']?.toString() ?? "SOS",
+                'latitude': double.tryParse((raw['latitude'] ?? raw['lat'])?.toString() ?? "0.0") ?? 0.0,
+                'longitude': double.tryParse((raw['longitude'] ?? raw['lon'])?.toString() ?? "0.0") ?? 0.0,
+                'timestamp': raw['reactivated_at']?.toString() ?? raw['timestamp']?.toString() ?? DateTime.now().toIso8601String(),
+                'status': 'active',
+                'resolved': false,
+                'cane_status': raw['cane_status']?.toString() ?? "RE-ACTIVATED",
+                'taken_by': raw['taken_by'],
+                'taken_by_name': raw['taken_by_name'],
+              });
+            }
+          }
+        });
+        lastReactivated = reactivatedList;
+      }
+      update();
+    });
+
+    controller.onCancel = () {
+      activeSub.cancel();
+      archiveSub.cancel();
+    };
+
+    return controller.stream;
   }
 
-  static Future<bool> resolveActiveAlert() async {
+  static Future<bool> resolveActiveAlert({Map<String, dynamic>? fullAlertData}) async {
     try {
+      print("DEBUG: resolveActiveAlert called");
       final snapshot = await _activeRef.get();
       if (!snapshot.exists) return false;
 
       final data = Map<String, dynamic>.from(snapshot.value as Map);
       final String alertId = data['id']?.toString() ?? "alert_${DateTime.now().millisecondsSinceEpoch}";
+      final String resolvedAtIso = DateTime.now().toIso8601String();
+      final String resolvedBy = BaseService.staffName ?? "Staff";
 
-      // 1. Préparer les données pour l'archive (Utilisation du snake_case pour la cohérence)
+      await _ensureAlertExistsInMySQL(alertId, fullAlertData ?? data);
+
+      print("DEBUG: Updating Backend MySQL for active alert $alertId");
+      final res = await http.put(
+        Uri.parse("${BaseService.baseUrl}/alerts/$alertId"),
+        headers: BaseService.headers,
+        body: jsonEncode({
+          "status": "resolved",
+          "resolved_by": resolvedBy,
+          "resolved_at": resolvedAtIso,
+        }),
+      );
+
+      if (res.statusCode != 200) {
+        _showError("Backend Resolve Fail: ${res.statusCode} - ${res.body}");
+        return false;
+      }
+
+      print("DEBUG: Moving alert to archive in Firebase...");
       data['status'] = 'resolved';
       data['resolved'] = true;
-      data['resolved_at'] = DateTime.now().toIso8601String();
-      data['resolved_by'] = BaseService.staffName ?? "Staff";
-      data['timestamp'] = data['resolved_at']; // Pour le tri dans l'historique
+      data['resolved_at'] = resolvedAtIso;
+      data['resolved_by'] = resolvedBy;
+      data['timestamp'] = resolvedAtIso;
 
-      // 2. Déplacer vers /alerts/{id}
       await _archiveRef.child(alertId).set(data);
-
-      // 3. Supprimer l'alerte active
       await _activeRef.remove();
 
-      print("✅ Alerte $alertId résolue et archivée.");
+      print("✅ Alerte active résolue avec succès.");
       return true;
     } catch (e) {
-      print("❌ Erreur lors de la résolution: $e");
+      _showError("Active Resolve Critical Error: $e");
       return false;
     }
   }
 
   static Stream<List<Map<String, dynamic>>> getHistoryStream() {
-    print("DEBUG: Listening to Firebase path (History): ${_archiveRef.path}");
     try {
       return _archiveRef.onValue.map((event) {
         final Object? value = event.snapshot.value;
@@ -387,71 +480,42 @@ class AlertService {
         final List<Map<String, dynamic>> alertsList = [];
         final Map<dynamic, dynamic> dataMap = {};
 
-        if (value is Map) {
-          dataMap.addAll(value);
-        } else if (value is List) {
-          for (int i = 0; i < value.length; i++) {
-            if (value[i] != null) dataMap[i.toString()] = value[i];
-          }
+        if (value is Map) dataMap.addAll(value);
+        else if (value is List) {
+          for (int i = 0; i < value.length; i++) if (value[i] != null) dataMap[i.toString()] = value[i];
         }
 
         dataMap.forEach((key, val) {
           try {
             if (val is Map) {
               final rawAlert = Map<dynamic, dynamic>.from(val);
-
-              // Only include resolved alerts for history stream
-              final bool resolved = rawAlert['resolved'] == true ||
-                  rawAlert['resolved']?.toString() == 'true';
+              final bool resolved = rawAlert['resolved'] == true || rawAlert['resolved']?.toString() == 'true';
               if (!resolved) return;
 
-              final String type = rawAlert['type']?.toString() ?? "";
-              final latVal = rawAlert['latitude'] ?? rawAlert['lat'];
-              final lonVal = rawAlert['longitude'] ?? rawAlert['lng'] ?? rawAlert['lon'];
-              
-              final userMap = rawAlert['user'];
-              String userName = "Inconnu";
-              if (userMap is Map) {
-                userName = userMap['name']?.toString() ?? "Inconnu";
-              }
-
-              // Use resolved_at or timestamp
+              final String userName = (rawAlert['user'] is Map) ? rawAlert['user']['name']?.toString() ?? "Inconnu" : "Inconnu";
               String timestamp = rawAlert['resolved_at']?.toString() ?? rawAlert['timestamp']?.toString() ?? DateTime.now().toIso8601String();
 
-              final sanitizedAlert = <String, dynamic>{
+              alertsList.add({
                 'alert_id': rawAlert['alert_id']?.toString() ?? key.toString(),
                 'firebase_key': key.toString(),
-                'user_id': rawAlert['user_id']?.toString() ?? key.toString(), 
+                'user_id': rawAlert['user_id']?.toString() ?? rawAlert['user']?['cin']?.toString() ?? key.toString(), 
                 'user_name': userName,
-                'type': type,
-                'latitude': double.tryParse(latVal?.toString() ?? "0.0") ?? 0.0,
-                'longitude': double.tryParse(lonVal?.toString() ?? "0.0") ?? 0.0,
+                'type': rawAlert['type']?.toString() ?? "SOS",
+                'latitude': double.tryParse((rawAlert['latitude'] ?? rawAlert['lat'])?.toString() ?? "0.0") ?? 0.0,
+                'longitude': double.tryParse((rawAlert['longitude'] ?? rawAlert['lng'] ?? rawAlert['lon'])?.toString() ?? "0.0") ?? 0.0,
                 'timestamp': timestamp,
                 'status': 'resolved',
                 'resolved_by': rawAlert['resolved_by']?.toString() ?? "Staff",
                 'response_time': rawAlert['response_time']?.toString() ?? "N/A",
-              };
-
-              alertsList.add(sanitizedAlert);
+              });
             }
-          } catch (itemError) {
-            print("DEBUG: Error processing history alert ($key): $itemError");
-          }
+          } catch (e) { print("History item error: $e"); }
         });
 
-        alertsList.sort((a, b) {
-          try {
-            return DateTime.parse(b['timestamp'])
-                .compareTo(DateTime.parse(a['timestamp']));
-          } catch (_) {
-            return 0;
-          }
-        });
-
+        alertsList.sort((a, b) => b['timestamp'].compareTo(a['timestamp']));
         return alertsList;
       });
     } catch (e) {
-      print("DEBUG: Firebase History Stream Error: $e");
       return Stream.value([]);
     }
   }

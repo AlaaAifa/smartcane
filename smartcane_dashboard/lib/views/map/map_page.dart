@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 import '../theme.dart';
 import '../../services/services.dart';
 
@@ -56,10 +57,7 @@ class _MapPageState extends State<MapPage> {
   @override
   Widget build(BuildContext context) {
     final alertColor = widget.alertType == "SOS" ? AppTheme.sosRed : AppTheme.helpOrange;
-    final initialCameraPosition = CameraPosition(
-      target: LatLng(widget.latitude, widget.longitude),
-      zoom: 15,
-    );
+    final initialCameraPosition = LatLng(widget.latitude, widget.longitude);
 
     return StreamBuilder<List<Map<String, dynamic>>>(
       stream: AlertService.getAlertsStream(),
@@ -67,25 +65,19 @@ class _MapPageState extends State<MapPage> {
         final alerts = snapshot.data ?? [];
         
         // Create markers for all active alerts
-        final Set<Marker> markers = alerts.map((alert) {
+        final List<Marker> markers = alerts.map((alert) {
           final lat = double.tryParse(alert['latitude']?.toString() ?? "") ?? widget.latitude;
           final lon = double.tryParse(alert['longitude']?.toString() ?? "") ?? widget.longitude;
-          final alertId = alert['alert_id']?.toString() ?? "unknown";
           final type = alert['type']?.toString() ?? "SOS";
-          final caneStatus = alert['cane_status']?.toString() ?? "normal";
+          final markerColor = type == "SOS" ? Colors.red : Colors.orange;
           
           return Marker(
-            markerId: MarkerId(alertId),
-            position: LatLng(lat, lon),
-            infoWindow: InfoWindow(
-              title: "Alerte $type - $caneStatus",
-              snippet: "Utilisateur: ${alert['user_id']}",
-            ),
-            icon: BitmapDescriptor.defaultMarkerWithHue(
-              type == "SOS" ? BitmapDescriptor.hueRed : BitmapDescriptor.hueOrange,
-            ),
+            point: LatLng(lat, lon),
+            width: 50,
+            height: 50,
+            child: Icon(Icons.location_on, color: markerColor, size: 40),
           );
-        }).toSet();
+        }).toList();
 
         return Padding(
           padding: const EdgeInsets.all(32),
@@ -131,13 +123,18 @@ class _MapPageState extends State<MapPage> {
                         children: [
                           ClipRRect(
                             borderRadius: BorderRadius.circular(20),
-                            child: GoogleMap(
-                              initialCameraPosition: initialCameraPosition,
-                              markers: markers,
-                              mapType: MapType.normal,
-                              myLocationEnabled: true,
-                              myLocationButtonEnabled: true,
-                              zoomControlsEnabled: true,
+                            child: FlutterMap(
+                              options: MapOptions(
+                                initialCenter: initialCameraPosition,
+                                initialZoom: 15.0,
+                              ),
+                              children: [
+                                TileLayer(
+                                  urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                                  userAgentPackageName: 'com.example.smartcane',
+                                ),
+                                MarkerLayer(markers: markers),
+                              ],
                             ),
                           ),
                           if (alerts.isNotEmpty)

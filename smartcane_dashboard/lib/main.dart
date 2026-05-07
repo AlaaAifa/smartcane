@@ -37,6 +37,9 @@ measurementId: "G-N56QLD2K56"
     print("DEBUG: Erreur critique d'initialisation Firebase: $e");
   }
 
+  // Set the ScaffoldMessenger key for service-layer notifications
+  AlertService.scaffoldMessengerKey = GlobalKey<ScaffoldMessengerState>();
+
   runApp(const SmartCaneDashboard());
 }
 
@@ -48,6 +51,7 @@ class SmartCaneDashboard extends StatelessWidget {
     return MaterialApp(
       title: 'Smart Cane Dashboard',
       debugShowCheckedModeBanner: false,
+      scaffoldMessengerKey: AlertService.scaffoldMessengerKey,
       theme: AppTheme.theme,
       home: const AppNavigator(),
     );

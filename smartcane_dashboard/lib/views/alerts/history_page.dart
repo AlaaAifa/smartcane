@@ -389,7 +389,15 @@ class _HistoryPageState extends State<HistoryPage> {
                                         ),
                                       );
                                       if (confirmed == true) {
-                                        await AlertService.deleteAlert(alert["alert_id"].toString());
+                                        final success = await AlertService.deleteAlert(
+                                          alert["alert_id"].toString(),
+                                          firebaseKey: alert["firebase_key"],
+                                        );
+                                        if (success && mounted) {
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            const SnackBar(content: Text("Alerte supprimée")),
+                                          );
+                                        }
                                       }
                                     },
                                     icon: const Icon(Icons.delete_outline, color: AppTheme.sosRed),

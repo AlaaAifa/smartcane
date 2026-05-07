@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'dart:async';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 import '../theme.dart';
 import '../../services/services.dart';
 
@@ -368,6 +369,7 @@ class _AlertsPageState extends State<AlertsPage> {
               await AlertService.takeAlert(
                 alert["alert_id"].toString(),
                 firebaseKey: alert["firebase_key"],
+                fullAlertData: alert,
               );
             }
             _showAlertDetails(alert, user);
@@ -728,31 +730,33 @@ class _AlertsPageState extends State<AlertsPage> {
                                 ),
                                 child: ClipRRect(
                                   borderRadius: BorderRadius.circular(14),
-                                  child: GoogleMap(
-                                    key: UniqueKey(), // Ensure correct initialization and rebuild for Web
-                                    initialCameraPosition: CameraPosition(
-                                      target: LatLng(lat, lon),
-                                      zoom: 15.0,
+                                  child: FlutterMap(
+                                    options: MapOptions(
+                                      initialCenter: LatLng(lat, lon),
+                                      initialZoom: 15.0,
+                                      onTap: (_, __) {
+                                        Navigator.pop(ctx);
+                                        widget.onNavigate?.call(
+                                          "/map?lat=$lat&lon=$lon&type=${alert['type']}",
+                                        );
+                                      },
                                     ),
-                                    markers: {
-                                      Marker(
-                                        markerId: const MarkerId("preview"),
-                                        position: LatLng(lat, lon),
-                                        infoWindow: InfoWindow(
-                                          title: "Position de l'utilisateur",
-                                          snippet: "${alert['type']} - $sentAt",
-                                        ),
+                                    children: [
+                                      TileLayer(
+                                        urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                                        userAgentPackageName: 'com.example.smartcane',
                                       ),
-                                    },
-                                    onTap: (_) {
-                                      Navigator.pop(ctx);
-                                      widget.onNavigate?.call(
-                                        "/map?lat=$lat&lon=$lon&type=${alert['type']}",
-                                      );
-                                    },
-                                    zoomControlsEnabled: true,
-                                    mapToolbarEnabled: true,
-                                    myLocationButtonEnabled: false,
+                                      MarkerLayer(
+                                        markers: [
+                                          Marker(
+                                            point: LatLng(lat, lon),
+                                            width: 50,
+                                            height: 50,
+                                            child: const Icon(Icons.location_on, color: Colors.red, size: 40),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
                                   ),
                                 ),
                               ),
@@ -844,7 +848,7 @@ class _AlertsPageState extends State<AlertsPage> {
                               );
 
                               if (confirmed == true) {
-                                final success = await AlertService.resolveActiveAlert();
+                                final success = await AlertService.resolveActiveAlert(fullAlertData: alert);
                                 
                                 if (mounted) {
                                   if (success) {
