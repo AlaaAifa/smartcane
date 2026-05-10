@@ -10,6 +10,19 @@ class AlertService {
   // Global reference for showing dialogs/snackbars from service if needed
   static GlobalKey<ScaffoldMessengerState>? scaffoldMessengerKey;
 
+  static final DatabaseReference _rootRef = FirebaseDatabase.instance.ref();
+  static final DatabaseReference _telemetryRef = FirebaseDatabase.instance.ref('smartcane/device1/telemetry');
+  static final DatabaseReference _activeRef = FirebaseDatabase.instance.ref('smartcane/device1/active_alert');
+  static final DatabaseReference _archiveRef = FirebaseDatabase.instance.ref('smartcane/device1/alerts_archive');
+
+  static Stream<Map<String, dynamic>> getTelemetryStream() {
+    return _telemetryRef.onValue.map((event) {
+      if (event.snapshot.value == null) return {};
+      final data = Map<String, dynamic>.from(event.snapshot.value as Map);
+      return data;
+    });
+  }
+
   static void _showError(String message) {
     print("❌ ALERT SERVICE ERROR: $message");
     if (scaffoldMessengerKey != null) {
@@ -321,8 +334,6 @@ class AlertService {
     return false;
   }
 
-  static DatabaseReference get _activeRef => FirebaseDatabase.instance.ref("smartcane/device1/active_alert");
-  static DatabaseReference get _archiveRef => FirebaseDatabase.instance.ref("alerts");
 
   static Stream<List<Map<String, dynamic>>> getAlertsStream() {
     final controller = StreamController<List<Map<String, dynamic>>>();
