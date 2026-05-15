@@ -14,7 +14,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }, observerOptions);
 
     // Elements to animate
-    document.querySelectorAll('.glass-card, .group, .section-title').forEach(el => {
+    document.querySelectorAll('.glass-card, .section-title').forEach(el => {
         el.style.opacity = '0';
         observer.observe(el);
     });

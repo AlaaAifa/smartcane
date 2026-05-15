@@ -708,7 +708,7 @@ class _AddUserPageState extends State<AddUserPage> {
 
         Text(
 
-          "Équipement de mobility avancée conçu pour une autonomie totale des personnes malvoyantes.",
+          "Équipement de mobilité avancée conçu pour une autonomie totale des personnes malvoyantes.",
 
           style: TextStyle(fontSize: 16, color: Colors.grey.shade700, height: 1.6),
 
@@ -724,7 +724,7 @@ class _AddUserPageState extends State<AddUserPage> {
 
         const SizedBox(height: 12),
 
-        _buildBulletInfo(Icons.headset_mic, "Assistance technique prioritiaire"),
+        _buildBulletInfo(Icons.headset_mic, "Assistance technique prioritaire"),
 
         const SizedBox(height: 12),
 

@@ -284,7 +284,7 @@ class _MessagesPageState extends State<MessagesPage> {
             children: [
               const SizedBox(height: 80),
               Icon(Icons.inbox_rounded, size: 64, color: Colors.grey.withOpacity(0.2)),
-              const SizedBox(height: 24),
+              const SizedBox(height: 16),
               Text(
                 "Aucun message ne correspond à vos critères",
                 style: TextStyle(fontSize: 16, color: Colors.grey.withOpacity(0.5), fontWeight: FontWeight.w600),
@@ -303,7 +303,7 @@ class _MessagesPageState extends State<MessagesPage> {
           crossAxisCount: crossAxisCount,
           crossAxisSpacing: 32,
           mainAxisSpacing: 32,
-          childAspectRatio: crossAxisCount == 1 ? 2.8 : 1.6,
+          childAspectRatio: crossAxisCount == 1 ? 2.3 : 1.4,
         ),
         delegate: SliverChildBuilderDelegate(
           (context, index) => _buildMessageCard(messages[index]),
@@ -351,7 +351,7 @@ class _MessagesPageState extends State<MessagesPage> {
               child: InkWell(
                 onTap: () => _showDetailsModal(msg),
                 child: Padding(
-                  padding: const EdgeInsets.all(24),
+                  padding: const EdgeInsets.all(20),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -389,7 +389,7 @@ class _MessagesPageState extends State<MessagesPage> {
                             ),
                         ],
                       ),
-                      const SizedBox(height: 24),
+                      const SizedBox(height: 16),
                       Text(
                         msg.subject.toUpperCase(),
                         maxLines: 1,
@@ -420,7 +420,7 @@ class _MessagesPageState extends State<MessagesPage> {
                           ),
                           const SizedBox(width: 8),
                           Text(
-                            isReplied ? "RÉPONSE ENVOYÉE" : "EN ATTENTE",
+                            isReplied ? "TRAITÉ ET RÉPONDU" : "EN ATTENTE",
                             style: TextStyle(
                               fontSize: 10,
                               fontWeight: FontWeight.w900,
@@ -526,7 +526,7 @@ class _MessagesPageState extends State<MessagesPage> {
 
                         Container(
 
-                          padding: const EdgeInsets.all(24),
+                          padding: const EdgeInsets.all(20),
 
                           decoration: BoxDecoration(
 
@@ -588,7 +588,7 @@ class _MessagesPageState extends State<MessagesPage> {
 
                         width: double.infinity,
 
-                        padding: const EdgeInsets.all(24),
+                        padding: const EdgeInsets.all(20),
 
                         decoration: BoxDecoration(color: const Color(0xFFF8FAFC), borderRadius: BorderRadius.circular(16)),
 
@@ -804,44 +804,27 @@ class _MessagesPageState extends State<MessagesPage> {
 
               ),
 
-              Padding(
-
-                padding: const EdgeInsets.all(40),
-
-                child: Column(
-
-                  crossAxisAlignment: CrossAxisAlignment.start,
-
-                  children: [
-
-                    _buildDialogField("Destinataire", TextEditingController(text: msg.email), Icons.email_outlined, enabled: false),
-
-                    const SizedBox(height: 24),
-
-                    _buildDialogField("Objet", subjectController, Icons.subject_rounded),
-
-                    const SizedBox(height: 32),
-
-                    const Text("VOTRE RÉPONSE :", style: TextStyle(fontWeight: FontWeight.w900, fontSize: 11, color: Color(0xFF94A3B8), letterSpacing: 1)),
-
-                    const SizedBox(height: 16),
-
-                    TextField(
-
-                      controller: bodyController,
-
-                      maxLines: 8,
-
-                      style: const TextStyle(color: AppTheme.primary, fontWeight: FontWeight.w600),
-
-                      decoration: AppTheme.inputDecoration("Écrivez votre message ici...", Icons.edit_note_rounded),
-
-                    ),
-
-                  ],
-
+              Flexible(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(40),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildDialogField("Destinataire", TextEditingController(text: msg.email), Icons.email_outlined, enabled: false),
+                      const SizedBox(height: 16),
+                      _buildDialogField("Objet", subjectController, Icons.subject_rounded),
+                      const SizedBox(height: 24),
+                      const Text("VOTRE RÉPONSE :", style: TextStyle(fontWeight: FontWeight.w900, fontSize: 11, color: Color(0xFF94A3B8), letterSpacing: 1)),
+                      const SizedBox(height: 16),
+                      TextField(
+                        controller: bodyController,
+                        maxLines: 6,
+                        style: const TextStyle(color: AppTheme.primary, fontWeight: FontWeight.w600),
+                        decoration: AppTheme.inputDecoration("Écrivez votre message ici...", Icons.edit_note_rounded),
+                      ),
+                    ],
+                  ),
                 ),
-
               ),
 
               Container(

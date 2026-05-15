@@ -1,0 +1,157 @@
+\documentclass[12pt,a4paper]{report}
+
+% --- Packages ---
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[french]{babel}
+\usepackage{graphicx}
+\usepackage{geometry}
+\usepackage{hyperref}
+\usepackage{titlesec}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{fancyhdr}
+\usepackage{setspace}
+
+% --- Configuration des marges ---
+\geometry{hmargin=2.5cm,vmargin=2.5cm}
+
+% --- Style de code ---
+\definecolor{codegreen}{rgb}{0,0.6,0}
+\definecolor{codegray}{rgb}{0.5,0.5,0.5}
+\definecolor{codepurple}{rgb}{0.58,0,0.82}
+\definecolor{backcolour}{rgb}{0.95,0.95,0.92}
+
+\lstdefinestyle{mystyle}{
+    backgroundcolor=\color{backcolour},   
+    commentstyle=\color{codegreen},
+    keywordstyle=\color{magenta},
+    numberstyle=\tiny\color{codegray},
+    stringstyle=\color{codepurple},
+    basicstyle=\ttfamily\footnotesize,
+    breakatwhitespace=false,         
+    breaklines=true,                 
+    captionpos=b,                    
+    keepspaces=true,                 
+    numbers=left,                    
+    numbersep=5pt,                  
+    showspaces=false,                
+    showstringspaces=false,
+    showtabs=false,                  
+    tabsize=2
+}
+\lstset{style=mystyle}
+
+% --- En-tête et Pied de page ---
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{Rapport de Projet : SmartCane}
+\fancyhead[R]{SIRIUS Tech}
+\fancyfoot[C]{\thepage}
+
+% --- Titre ---
+\begin{document}
+
+\begin{titlepage}
+    \centering
+    \vspace*{1cm}
+    \includegraphics[width=0.4\textwidth]{centre.png}\par\vspace{1cm}
+    {\scshape\LARGE Institution / Université \par}
+    \vspace{1.5cm}
+    {\huge\bfseries SmartCane : Solution Connectée pour Malvoyants \par}
+    \vspace{2cm}
+    {\Large Rapport de Projet de Fin d'Études / Stage \par}
+    \vspace{2cm}
+    \begin{minipage}{0.4\textwidth}
+        \begin{flushleft} \large
+            \emph{Auteur :}\\
+            Alaa \textsc{Aifa}
+        \end{flushleft}
+    \end{minipage}
+    \begin{minipage}{0.4\textwidth}
+        \begin{flushright} \large
+            \emph{Encadrant :} \\
+            M. / Mme \textsc{Prénom Nom}
+        \end{flushright}
+    \end{minipage}
+    \vfill
+    {\large \today \par}
+\end{titlepage}
+
+\tableofcontents
+\newpage
+
+\chapter*{Remerciements}
+\addcontentsline{toc}{chapter}{Remerciements}
+Je tiens à remercier... (À compléter)
+
+\chapter{Introduction Générale}
+Le projet \textbf{SmartCane} (SIRIUS) est une solution technologique innovante dédiée à l'amélioration de l'autonomie et de la sécurité des personnes malvoyantes. Grâce à l'intégration de technologies IoT, Cloud et Mobiles, SmartCane offre un système de surveillance et d'assistance en temps réel.
+
+\chapter{Analyse et Conception}
+\section{Objectifs du projet}
+\begin{itemize}
+    \item Localisation GPS en temps réel.
+    \item Détection de chutes et situations d'urgence.
+    \item Interface de gestion pour les centres de supervision (Dashboard).
+    \item Site web vitrine pour la présentation des services.
+\end{itemize}
+
+\section{Architecture Globale}
+L'architecture repose sur trois piliers :
+\begin{enumerate}
+    \item \textbf{Hardware (IoT) :} Basé sur l'ESP32, il collecte les données des capteurs et les envoie via Firebase.
+    \item \textbf{Backend :} API développée avec FastAPI et MySQL pour la gestion persistante des utilisateurs et des historiques.
+    \item \textbf{Frontend :} 
+    \begin{itemize}
+        \item Dashboard Flutter pour le monitoring en temps réel.
+        \item Site Web HTML/Tailwind pour la présentation commerciale.
+    \end{itemize}
+\end{enumerate}
+
+\chapter{Réalisation Technique}
+
+\section{Backend : FastAPI \& MySQL}
+Le backend assure la gestion des comptes, des locations et de l'historique des alertes. 
+\begin{lstlisting}[language=Python, caption=Exemple d'endpoint FastAPI]
+@router.post("/alerts", response_model=schemas.Alert)
+def create_alert(alert: schemas.AlertCreate, db: Session = Depends(get_db)):
+    return alerts_service.create_alert(db, alert)
+\end{lstlisting}
+
+\section{Frontend Dashboard : Flutter}
+Le dashboard permet aux agents de SIRIUS de suivre les utilisateurs. L'intégration de Firebase Realtime Database permet une réactivité instantanée.
+\begin{lstlisting}[language=Dart, caption=Synchronisation Firebase dans Flutter]
+_activeRef.onValue.listen((event) {
+  // Mise a jour du statut en temps reel
+});
+\end{lstlisting}
+
+\section{Site Web Vitrine}
+Utilisation de Tailwind CSS pour un design moderne et responsive. Il permet une présentation fluide des trois modèles : \textit{Smart Lite}, \textit{Smart Pro} et \textit{Smart Elite}.
+
+\chapter{Architecture Logicielle}
+\section{Modélisation de la Base de Données}
+Le système utilise une base de données MySQL structurée autour des entités suivantes :
+\begin{itemize}
+    \item \textbf{Utilisateurs :} Gestion des clients (malvoyants) et du personnel (staff/admin).
+    \item \textbf{Cannes :} Inventaire des dispositifs disponibles et leur état.
+    \item \textbf{Alertes :} Journalisation des incidents SOS et HELP avec coordonnées GPS.
+    \item \textbf{Locations \& Abonnements :} Suivi commercial des équipements.
+\end{itemize}
+
+\section{Services Backend}
+L'API FastAPI est découpée en services spécialisés :
+\begin{itemize}
+    \item \texttt{AlertService} : Gère la logique de résolution et de synchronisation.
+    \item \texttt{AuthService} : Sécurise l'accès via hachage Bcrypt et gestion de mots de passe.
+    \item \texttt{EmailService} : Automatise les réponses aux messages clients via SMTP.
+\end{itemize}
+
+\chapter{Conclusion et Perspectives}
+Le projet SmartCane démontre l'efficacité de l'Internet des Objets au service du social. Les perspectives d'évolution incluent l'intégration de l'Intelligence Artificielle pour la reconnaissance d'obstacles via caméra.
+
+\bibliographystyle{plain}
+\bibliography{references}
+
+\end{document}

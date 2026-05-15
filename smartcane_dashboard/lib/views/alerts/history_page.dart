@@ -257,6 +257,14 @@ class _HistoryPageState extends State<HistoryPage> {
                           final bool isAdmin = BaseService.isAdmin;
                           final bool canReactivate = allowed && (isResolver || isAdmin);
 
+                          String formattedTime = alert["timestamp"]?.toString() ?? "";
+                          try {
+                            if (formattedTime.isNotEmpty) {
+                              final DateTime ts = DateTime.parse(formattedTime);
+                              formattedTime = "${ts.day.toString().padLeft(2, '0')}/${ts.month.toString().padLeft(2, '0')}/${ts.year} - ${ts.hour.toString().padLeft(2, '0')}h${ts.minute.toString().padLeft(2, '0')}";
+                            }
+                          } catch (_) {}
+
                           return Container(
                             margin: const EdgeInsets.only(bottom: 20),
                             padding: const EdgeInsets.all(24),
@@ -299,12 +307,17 @@ class _HistoryPageState extends State<HistoryPage> {
                                         ],
                                       ),
                                       const SizedBox(height: 6),
-                                      Row(
-                                        children: [
-                                          const Icon(Icons.timer_rounded, size: 16, color: AppTheme.neonGreen),
-                                          const SizedBox(width: 8),
-                                          Text("RÉPONSE: ${alert["response_time"]?.toString() ?? "-"}", style: const TextStyle(color: AppTheme.neonGreen, fontSize: 12, fontWeight: FontWeight.w900)),
-                                        ],
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                        decoration: BoxDecoration(color: AppTheme.neonGreen.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            const Icon(Icons.timer_rounded, size: 14, color: AppTheme.neonGreen),
+                                            const SizedBox(width: 6),
+                                            Text("RÉSOLU EN : ${alert["response_time"]?.toString() ?? "-"}", style: const TextStyle(color: AppTheme.neonGreen, fontSize: 11, fontWeight: FontWeight.w900, letterSpacing: 0.5)),
+                                          ],
+                                        ),
                                       ),
                                     ],
                                   ),
@@ -314,7 +327,18 @@ class _HistoryPageState extends State<HistoryPage> {
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.end,
                                     children: [
-                                      Text(alert["timestamp"]?.toString() ?? "", style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12, fontWeight: FontWeight.w600)),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                        decoration: BoxDecoration(color: const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(8)),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            const Icon(Icons.calendar_today_rounded, size: 14, color: Color(0xFF64748B)),
+                                            const SizedBox(width: 8),
+                                            Text(formattedTime, style: const TextStyle(color: Color(0xFF475569), fontSize: 12, fontWeight: FontWeight.w800)),
+                                          ],
+                                        ),
+                                      ),
                                       const SizedBox(height: 8),
                                       if (allowed && !isResolver && !isAdmin)
                                         const Text("🔒 AGENT DIFFÉRENT", style: TextStyle(color: AppTheme.accent, fontSize: 10, fontWeight: FontWeight.w900)),

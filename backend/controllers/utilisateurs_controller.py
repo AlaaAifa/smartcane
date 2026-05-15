@@ -1,7 +1,8 @@
-from typing import List, Union
+from typing import List, Union, Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
+from pydantic import Field
 
 from backend import schemas
 from backend.database import get_db
@@ -11,7 +12,10 @@ router = APIRouter(prefix="/users", tags=["Users"])
 
 
 @router.post("", response_model=Union[schemas.Client, schemas.Staff, schemas.Utilisateur], status_code=status.HTTP_201_CREATED)
-def create_user(user: Union[schemas.ClientCreate, schemas.StaffCreate], db: Session = Depends(get_db)):
+def create_user(
+    user: Annotated[Union[schemas.ClientCreate, schemas.StaffCreate], Field(discriminator="role")], 
+    db: Session = Depends(get_db)
+):
     db_user, error = utilisateurs_service.create_user(db, user)
     if error:
         raise HTTPException(status_code=400, detail=error)

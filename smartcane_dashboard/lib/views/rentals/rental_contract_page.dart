@@ -280,19 +280,19 @@ class RentalContractPage extends StatelessWidget {
                       child: _infoBlock([
 
 
-                        _contractRow("Nom & Prénom", rentalData['full_name'] ?? 'Non renseign'),
+                        _contractRow("Nom & Prénom", rentalData['full_name'] ?? 'Non renseigné'),
 
 
-                        _contractRow("CIN", rentalData['cin'] ?? 'Non renseign'),
+                        _contractRow("CIN", rentalData['cin'] ?? 'Non renseigné'),
 
 
-                        _contractRow("Email", rentalData['email'] ?? 'Non renseign'),
+                        _contractRow("Email", rentalData['email'] ?? 'Non renseigné'),
 
 
-                        _contractRow("Téléphone", rentalData['phone'] ?? 'Non renseign'),
+                        _contractRow("Téléphone", rentalData['phone'] ?? 'Non renseigné'),
 
 
-                        _contractRow("Date de Naissance", rentalData['birth_date'] ?? 'Non renseign'),
+                        _contractRow("Date de Naissance", rentalData['birth_date'] ?? 'Non renseigné'),
 
 
                       ]),
@@ -319,7 +319,7 @@ class RentalContractPage extends StatelessWidget {
                         _contractRow("Contact d'Urgence", "${rentalData['emergency_name']} (${rentalData['emergency_relation']})"),
 
 
-                        _contractRow("Tél. Urgence", rentalData['emergency_phone'] ?? 'Non renseign'),
+                        _contractRow("Tél. Urgence", rentalData['emergency_phone'] ?? 'Non renseigné'),
 
 
                       ]),
@@ -406,7 +406,7 @@ class RentalContractPage extends StatelessWidget {
                             const SizedBox(height: 12),
 
 
-                            Text("N° SIM (4G) Loué : ${rentalData['sim_number'] ?? 'Non renseign'}", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppTheme.primary)),
+                            Text("N° SIM (4G) Loué : ${rentalData['sim_number'] ?? 'Non renseigné'}", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppTheme.primary)),
 
 
                           ],
@@ -469,7 +469,7 @@ class RentalContractPage extends StatelessWidget {
                             const Text("TOTAL PAYÉ A LA REMISE", style: TextStyle(color: Colors.grey, fontSize: 11)),
 
 
-                            Text("${rentalData['total_price'] ?? 'Non renseign'} TND", style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 20, color: AppTheme.primary)),
+                            Text("${rentalData['total_price'] ?? 'Non renseigné'} TND", style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 20, color: AppTheme.primary)),
 
 
                           ],
@@ -514,10 +514,10 @@ class RentalContractPage extends StatelessWidget {
                     Expanded(child: _infoBlock([
 
 
-                      _contractRow("Montant Réglé", "${rentalData['total_price'] ?? 'Non renseign'} TND"),
+                      _contractRow("Montant Réglé", "${rentalData['total_price'] ?? 'Non renseigné'} TND"),
 
 
-                      _contractRow("Mode de Paiement", rentalData['payment_method'] ?? 'Non renseign'),
+                      _contractRow("Mode de Paiement", rentalData['payment_method'] ?? 'Non renseigné'),
 
 
                       _contractRow("Caution (Matériel)", "Garantie par contrat"),
@@ -532,10 +532,10 @@ class RentalContractPage extends StatelessWidget {
                     Expanded(child: _infoBlock([
 
 
-                      _contractRow("Date de Début", rentalData['start_date'] ?? 'Non renseign'),
+                      _contractRow("Date de Début", rentalData['start_date'] ?? 'Non renseigné'),
 
 
-                      _contractRow("Date de Fin", rentalData['end_date'] ?? 'Non renseign'),
+                      _contractRow("Date de Fin", rentalData['end_date'] ?? 'Non renseigné'),
 
 
                       _contractRow("Personnel", "____________________"),
@@ -622,7 +622,7 @@ class RentalContractPage extends StatelessWidget {
                           const SizedBox(height: 6),
 
 
-                          Text("${rentalData['full_name'] ?? 'Non renseign'}", style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                          Text("${rentalData['full_name'] ?? 'Non renseigné'}", style: const TextStyle(color: Colors.grey, fontSize: 12)),
 
 
                           const SizedBox(height: 12),

@@ -31,6 +31,14 @@ def get_alert(alert_id: str, db: Session = Depends(get_db)):
     return db_alert
 
 
+@router.delete("/history/clear")
+def clear_history(db: Session = Depends(get_db)):
+    success = alerts_service.clear_alert_history(db)
+    if not success:
+        raise HTTPException(status_code=500, detail="Erreur lors de la suppression de l'historique")
+    return {"message": "Historique supprime avec succes"}
+
+
 @router.put("/{alert_id}", response_model=schemas.Alert)
 def update_alert(alert_id: str, alert_update: schemas.AlertUpdate, db: Session = Depends(get_db)):
     db_alert = alerts_service.update_alert(db, alert_id, alert_update)

@@ -2,7 +2,7 @@ from .abonnement import Abonnement
 from .alert import Alert
 from .canne import Canne
 from .location import Location
-from .utilisateur import Utilisateur, Client, Staff
+from .utilisateur import Utilisateur, Client, Staff, Admin
 from .reset_code import ResetCode
 
 __all__ = [
@@ -13,5 +13,6 @@ __all__ = [
     "Utilisateur",
     "Client",
     "Staff",
+    "Admin",
     "ResetCode",
 ]

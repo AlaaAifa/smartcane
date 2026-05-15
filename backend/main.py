@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from fastapi.staticfiles import StaticFiles
 from backend.controllers.abonnements_controller import router as abonnements_router
 from backend.controllers.alerts_controller import router as alerts_router
 from backend.controllers.auth_controller import router as auth_router
@@ -20,10 +21,12 @@ except Exception as exc:
 
 app = FastAPI(title="Smart Cane API", version="4.0.0")
 
+app.mount("/web", StaticFiles(directory="web"), name="web")
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )

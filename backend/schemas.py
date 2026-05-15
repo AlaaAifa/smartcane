@@ -1,7 +1,7 @@
 from datetime import date, datetime
-from typing import Optional
+from typing import Optional, Union, Literal
 
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 
 
 class UtilisateurBase(BaseModel):
@@ -43,7 +43,7 @@ class ClientBase(UtilisateurBase):
 
 
 class ClientCreate(ClientBase):
-    role: str = "client"
+    role: Literal["client"] = "client"
 
 
 class ClientUpdate(UtilisateurUpdate):
@@ -65,7 +65,7 @@ class StaffBase(UtilisateurBase):
 
 class StaffCreate(StaffBase):
     password_login: str
-    role: str = "staff"
+    role: Literal["staff", "admin"] = "staff"
 
 
 class StaffUpdate(UtilisateurUpdate):

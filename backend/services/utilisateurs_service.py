@@ -21,6 +21,11 @@ def create_user(db: Session, user: Union[schemas.ClientCreate, schemas.StaffCrea
         user_data = user.model_dump()
         user_data["password_login"] = security.get_password_hash(user_data["password_login"])
         db_user = models.Staff(**user_data)
+    elif user.role == "admin":
+        # Hash password for admin
+        user_data = user.model_dump()
+        user_data["password_login"] = security.get_password_hash(user_data["password_login"])
+        db_user = models.Admin(**user_data)
     else:
         return None, "Role invalide"
 
@@ -63,10 +68,18 @@ def update_user(db: Session, cin: str, user_update: Union[schemas.ClientUpdate, 
 
 
 def delete_user(db: Session, cin: str):
-    db_user = get_user_by_cin(db, cin)
-    if not db_user:
-        return False
+    try:
+        print(f"DEBUG: Tentative de suppression de l'utilisateur CIN: {cin}")
+        db_user = get_user_by_cin(db, cin)
+        if not db_user:
+            print(f"DEBUG: Utilisateur {cin} non trouve")
+            return False
 
-    db.delete(db_user)
-    db.commit()
-    return True
+        db.delete(db_user)
+        db.commit()
+        print(f"DEBUG: Utilisateur {cin} supprime avec succes")
+        return True
+    except Exception as e:
+        db.rollback()
+        print(f"DEBUG: ERREUR SQL lors de la suppression de {cin}: {e}")
+        return False

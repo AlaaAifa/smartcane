@@ -23,7 +23,8 @@ def login(req: LoginRequest, db: Session = Depends(get_db)):
     if user:
         # Si l'utilisateur existe en base, on utilise UNIQUEMENT le mot de passe de la base
         if security.verify_password(req.password, user.password_login):
-            role = "admin" if req.email == admin_email else "staff"
+            # Priorité à l'email admin défini dans le .env, sinon on prend le rôle de la base
+            role = "admin" if req.email == admin_email else user.role
             return {
                 "token": f"token_{user.cin}",
                 "role": role,

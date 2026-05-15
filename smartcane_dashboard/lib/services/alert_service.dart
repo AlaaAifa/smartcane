@@ -1,12 +1,23 @@
 import 'dart:convert';
 import 'dart:async';
- import 'package:http/http.dart' as http;
+import 'package:http/http.dart' as http;
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
 import 'base_service.dart';
 import 'user_service.dart';
 
 class AlertService {
+  // Global notifier for immediate UI reaction
+  static final ValueNotifier<Map<String, dynamic>> caneStatusNotifier = ValueNotifier<Map<String, dynamic>>(<String, dynamic>{});
+
+  static void init() {
+    _caneStatusRef.onValue.listen((event) {
+      if (event.snapshot.value != null) {
+        caneStatusNotifier.value = Map<String, dynamic>.from(event.snapshot.value as Map);
+      }
+    });
+  }
+
   // Global reference for showing dialogs/snackbars from service if needed
   static GlobalKey<ScaffoldMessengerState>? scaffoldMessengerKey;
 
@@ -14,12 +25,24 @@ class AlertService {
   static final DatabaseReference _telemetryRef = FirebaseDatabase.instance.ref('smartcane/device1/telemetry');
   static final DatabaseReference _activeRef = FirebaseDatabase.instance.ref('smartcane/device1/active_alert');
   static final DatabaseReference _archiveRef = FirebaseDatabase.instance.ref('smartcane/device1/alerts_archive');
+  static final DatabaseReference _caneStatusRef = FirebaseDatabase.instance.ref('cane_status/alaa_aifa');
+
+  static Stream<Map<String, dynamic>> getCaneStatusStream() => caneStatusNotifier.value.isEmpty 
+    ? _caneStatusRef.onValue.map((e) => Map<String, dynamic>.from(e.snapshot.value as Map)) 
+    : Stream.value(caneStatusNotifier.value);
 
   static Stream<Map<String, dynamic>> getTelemetryStream() {
     return _telemetryRef.onValue.map((event) {
-      if (event.snapshot.value == null) return {};
+      if (event.snapshot.value == null) return <String, dynamic>{};
       final data = Map<String, dynamic>.from(event.snapshot.value as Map);
       return data;
+    });
+  }
+
+  static Stream<Map<String, dynamic>?> getActiveAlertStream() {
+    return _activeRef.onValue.map((event) {
+      if (event.snapshot.value == null) return null;
+      return Map<String, dynamic>.from(event.snapshot.value as Map);
     });
   }
 
@@ -201,6 +224,10 @@ class AlertService {
           "response_time": responseTimeStr,
         });
         print("DEBUG: Firebase update success for $targetKey");
+
+        // NEW: Auto-resolve other older active alerts for the same user
+        final String? userId = fullAlertData?['user_id']?.toString() ?? (fullAlertData?['user'] is Map ? fullAlertData!['user']['cin']?.toString() : null);
+        await _resolveAllUserAlerts(userId, resolvedAtIso, responseTimeStr, targetKey);
       } catch (fbe) {
         _showError("Firebase Fail: $fbe");
         return false;
@@ -342,8 +369,42 @@ class AlertService {
 
     void update() {
       if (!controller.isClosed) {
-        final combined = [...lastActive, ...lastReactivated];
-        combined.sort((a, b) => (b['timestamp'] ?? "").compareTo(a['timestamp'] ?? ""));
+        final all = [...lastActive, ...lastReactivated];
+        // Tri par date décroissante (plus récent en premier)
+        all.sort((a, b) {
+          final String tA = a['timestamp']?.toString() ?? "";
+          final String tB = b['timestamp']?.toString() ?? "";
+          return tB.compareTo(tA);
+        });
+        
+        // Dédoublonnement par user_id
+        final Map<String, Map<String, dynamic>> uniqueAlerts = {};
+        for (var alert in all) {
+          final userId = alert['user_id']?.toString() ?? "unknown";
+          // Si l'utilisateur est connu, on ne garde que sa première alerte rencontrée (la plus récente)
+          if (userId != "unknown") {
+            if (!uniqueAlerts.containsKey(userId)) {
+              uniqueAlerts[userId] = alert;
+            }
+          } else {
+            // Pour les inconnus, on les garde tous car ce sont peut-être des personnes différentes
+            final fakeId = "unknown_${alert['alert_id']}";
+            uniqueAlerts[fakeId] = alert;
+          }
+        }
+
+        final combined = uniqueAlerts.values.toList();
+        combined.sort((a, b) {
+          int priorityA = a['type'] == 'SOS' ? 2 : (a['type'] == 'HELP' ? 1 : 0);
+          int priorityB = b['type'] == 'SOS' ? 2 : (b['type'] == 'HELP' ? 1 : 0);
+          
+          if (priorityA != priorityB) {
+            return priorityB.compareTo(priorityA);
+          }
+          final String tA = a['timestamp']?.toString() ?? "";
+          final String tB = b['timestamp']?.toString() ?? "";
+          return tB.compareTo(tA);
+        });
         controller.add(combined);
       }
     }
@@ -355,21 +416,35 @@ class AlertService {
       } else {
         try {
           final raw = Map<dynamic, dynamic>.from(value as Map);
+          
+          // Détection robuste des champs (Bridge vs ESP32 direct)
+          final String id = raw['id']?.toString() ?? raw['alert_id']?.toString() ?? "active";
+          final String type = (raw['type']?.toString() ?? "SOS").toUpperCase();
+          final String ts = raw['timestamp']?.toString() ?? DateTime.now().toIso8601String();
+          
+          // Extraction du nom utilisateur
+          String userName = "Inconnu";
+          String userId = "unknown";
+          if (raw['user'] is Map) {
+            userName = raw['user']['name']?.toString() ?? "Inconnu";
+            userId = raw['user']['cin']?.toString() ?? "unknown";
+          } else {
+            userName = raw['user_name']?.toString() ?? "Inconnu";
+            userId = raw['user_id']?.toString() ?? "unknown";
+          }
+
           lastActive = [{
-            'alert_id': raw['id']?.toString() ?? "active",
+            'alert_id': id,
             'firebase_key': "active_alert",
-            'user_id': raw['user']?['cin']?.toString() ?? "unknown",
-            'user_name': raw['user']?['name']?.toString() ?? "Inconnu",
-            'user_phone': raw['user']?['phone']?.toString() ?? "",
-            'type': raw['type']?.toString() ?? "SOS",
-            'count': raw['count'] ?? 1,
+            'user_id': userId,
+            'user_name': userName,
+            'type': type,
             'latitude': double.tryParse(raw['latitude']?.toString() ?? "36.8065") ?? 36.8065,
             'longitude': double.tryParse(raw['longitude']?.toString() ?? "10.1815") ?? 10.1815,
-            'timestamp': DateTime.fromMillisecondsSinceEpoch(raw['lastUpdatedAt'] ?? DateTime.now().millisecondsSinceEpoch).toIso8601String(),
-            'createdAt': DateTime.fromMillisecondsSinceEpoch(raw['createdAt'] ?? DateTime.now().millisecondsSinceEpoch).toIso8601String(),
+            'timestamp': ts,
             'status': 'active',
             'resolved': false,
-            'cane_status': raw['caneStatus']?.toString() ?? "NORMAL",
+            'cane_status': raw['caneStatus']?.toString() ?? raw['cane_status']?.toString() ?? "NORMAL",
             'taken_by': raw['taken_by'],
             'taken_by_name': raw['taken_by_name'],
           }];
@@ -402,12 +477,19 @@ class AlertService {
             if (raw['status'] == 'active' || raw['resolved'] == false || raw['resolved']?.toString() == 'false') {
               final userMap = raw['user'];
               String userName = "Inconnu";
-              if (userMap is Map) userName = userMap['name']?.toString() ?? "Inconnu";
+              String userId = raw['user_id']?.toString() ?? "unknown";
+              
+              if (userMap is Map) {
+                userName = userMap['name']?.toString() ?? "Inconnu";
+                if (userId == "unknown") {
+                  userId = userMap['cin']?.toString() ?? "unknown";
+                }
+              }
 
               reactivatedList.add({
                 'alert_id': raw['alert_id']?.toString() ?? key.toString(),
                 'firebase_key': key.toString(),
-                'user_id': raw['user_id']?.toString() ?? raw['user']?['cin']?.toString() ?? "unknown",
+                'user_id': userId,
                 'user_name': userName,
                 'type': raw['type']?.toString() ?? "SOS",
                 'latitude': double.tryParse((raw['latitude'] ?? raw['lat'])?.toString() ?? "0.0") ?? 0.0,
@@ -433,6 +515,58 @@ class AlertService {
     };
 
     return controller.stream;
+  }
+
+  static Future<void> _resolveAllUserAlerts(String? userId, String resolvedAtIso, String responseTimeStr, String targetKeyToSkip) async {
+    if (userId == null || userId == "unknown" || userId.isEmpty) return;
+    try {
+      final snapshot = await _archiveRef.get();
+      if (!snapshot.exists) return;
+      
+      final allData = Map<dynamic, dynamic>.from(snapshot.value as Map);
+      for (var entry in allData.entries) {
+        final key = entry.key.toString();
+        if (key == targetKeyToSkip) continue;
+        
+        if (entry.value is Map) {
+          final raw = Map<dynamic, dynamic>.from(entry.value);
+          final bool isResolved = raw['resolved'] == true || raw['status'] == 'RESOLVED' || raw['status'] == 'resolved';
+          
+          String? alertUserId = raw['user_id']?.toString();
+          if (alertUserId == null && raw['user'] is Map) {
+            alertUserId = raw['user']['cin']?.toString();
+          }
+          
+          if (!isResolved && alertUserId == userId) {
+            print("DEBUG: Auto-resolving older alert $key for user $userId");
+            await _archiveRef.child(key).update({
+              "status": "RESOLVED",
+              "resolved": true,
+              "resolved_at": resolvedAtIso,
+              "resolved_by": "Système (Groupé)",
+              "response_time": responseTimeStr,
+            });
+            try {
+                final String oldAlertId = raw['alert_id']?.toString() ?? raw['id']?.toString() ?? key;
+                await http.put(
+                    Uri.parse("${BaseService.baseUrl}/alerts/$oldAlertId"),
+                    headers: BaseService.headers,
+                    body: jsonEncode({
+                        "status": "resolved",
+                        "resolved_by": "Système (Groupé)",
+                        "resolved_at": resolvedAtIso,
+                        "response_time": responseTimeStr,
+                    }),
+                );
+            } catch (e) {
+                print("DEBUG: Auto-resolve MySQL error: $e");
+            }
+          }
+        }
+      }
+    } catch (e) {
+      print("DEBUG: _resolveAllUserAlerts error: $e");
+    }
   }
 
   static Future<bool> resolveActiveAlert({Map<String, dynamic>? fullAlertData}) async {
@@ -474,10 +608,34 @@ class AlertService {
       await _archiveRef.child(alertId).set(data);
       await _activeRef.remove();
 
+      // NEW: Auto-resolve other older active alerts for the same user
+      final String? userId = data['user_id']?.toString() ?? (data['user'] is Map ? data['user']['cin']?.toString() : null);
+      await _resolveAllUserAlerts(userId, resolvedAtIso, "0s", alertId);
+
       print("✅ Alerte active résolue avec succès.");
       return true;
     } catch (e) {
       _showError("Active Resolve Critical Error: $e");
+      return false;
+    }
+  }
+
+  static Future<bool> dismissActiveAlertBanner() async {
+    try {
+      final snapshot = await _activeRef.get();
+      if (snapshot.exists) {
+        final data = Map<String, dynamic>.from(snapshot.value as Map);
+        final String alertId = data['id']?.toString() ?? "alert_${DateTime.now().millisecondsSinceEpoch}";
+        // Garantir un timestamp consistant pour le tri
+        data['timestamp'] = data['timestamp']?.toString() ?? DateTime.now().toIso8601String();
+        data['status'] = 'active';
+        // On transfère l'alerte vers l'archive Firebase sans la résoudre
+        await _archiveRef.child(alertId).set(data);
+      }
+      await _activeRef.remove();
+      return true;
+    } catch (e) {
+      print("❌ Erreur lors du nettoyage de la bannière: $e");
       return false;
     }
   }

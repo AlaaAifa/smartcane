@@ -204,13 +204,13 @@ class _UsersPageState extends State<UsersPage> {
                       children: [
                         _sectionTitle("COORDONNÉES PERSONNELLES"),
                         const SizedBox(height: 24),
-                        _fieldOrText("CIN", user["cin"]?.toString() ?? "Non renseign", null, false),
-                        _fieldOrText("Nom Complet", user["nom"]?.toString() ?? "Non renseign", nameCtrl, isEditing, icon: Icons.person_outline_rounded),
-                        _fieldOrText("Adresse Email", user["email"]?.toString() ?? "Non renseign", emailCtrl, isEditing, icon: Icons.email_outlined),
-                        _fieldOrText("Téléphone Client", user["numero_de_telephone"]?.toString() ?? "Non renseign", phoneCtrl, isEditing, isPhone: true, icon: Icons.phone_android_rounded),
-                        _fieldOrText("Contact Familial (SOS)", user["contact_familial"]?.toString() ?? "Non renseign", familyCtrl, isEditing, isPhone: true, icon: Icons.family_restroom_rounded),
-                        _fieldOrText("Adresse de Résidence", user["adresse"]?.toString() ?? "Non renseign", addressCtrl, isEditing, icon: Icons.home_outlined),
-                        _fieldOrText("SIM de la Canne", user["sim_de_la_canne"]?.toString() ?? "Non renseign", simCtrl, isEditing, isPhone: true, icon: Icons.sim_card_outlined),
+                        _fieldOrText("CIN", user["cin"]?.toString() ?? "Non renseigné", null, false),
+                        _fieldOrText("Nom Complet", user["nom"]?.toString() ?? "Non renseigné", nameCtrl, isEditing, icon: Icons.person_outline_rounded),
+                        _fieldOrText("Adresse Email", user["email"]?.toString() ?? "Non renseigné", emailCtrl, isEditing, icon: Icons.email_outlined),
+                        _fieldOrText("Téléphone Client", user["numero_de_telephone"]?.toString() ?? "Non renseigné", phoneCtrl, isEditing, isPhone: true, icon: Icons.phone_android_rounded),
+                        _fieldOrText("Contact Familial (SOS)", user["contact_familial"]?.toString() ?? "Non renseigné", familyCtrl, isEditing, isPhone: true, icon: Icons.family_restroom_rounded),
+                        _fieldOrText("Adresse de Résidence", user["adresse"]?.toString() ?? "Non renseigné", addressCtrl, isEditing, icon: Icons.home_outlined),
+                        _fieldOrText("SIM de la Canne", user["sim_de_la_canne"]?.toString() ?? "Non renseigné", simCtrl, isEditing, isPhone: true, icon: Icons.sim_card_outlined),
                         
                         const Padding(padding: EdgeInsets.symmetric(vertical: 32), child: Divider(height: 1, color: Color(0xFFF1F5F9))),
                         

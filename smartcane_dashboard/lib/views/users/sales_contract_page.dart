@@ -232,19 +232,19 @@ class SalesContractPage extends StatelessWidget {
                 _infoBlock([
 
 
-                  _contractRow("Nom Complet", saleData["nom"]?.toString() ?? "Non renseign"),
+                  _contractRow("Nom Complet", saleData["nom"]?.toString() ?? "Non renseigné"),
 
 
-                  _contractRow("CIN", saleData["cin"]?.toString() ?? "Non renseign"),
+                  _contractRow("CIN", saleData["cin"]?.toString() ?? "Non renseigné"),
 
 
-                  _contractRow("Date de Naissance", saleData["birth_date"]?.toString() ?? "Non renseign"),
+                  _contractRow("Date de Naissance", saleData["birth_date"]?.toString() ?? "Non renseigné"),
 
 
-                  _contractRow("Email", saleData["email"]?.toString() ?? "Non renseign"),
+                  _contractRow("Email", saleData["email"]?.toString() ?? "Non renseigné"),
 
 
-                  _contractRow("Téléphone", saleData["numero_de_telephone"]?.toString() ?? "Non renseign"),
+                  _contractRow("Téléphone", saleData["numero_de_telephone"]?.toString() ?? "Non renseigné"),
 
 
                   _contractRow("Adresse", _formatAddress(saleData['address'])),
@@ -265,13 +265,13 @@ class SalesContractPage extends StatelessWidget {
                 _infoBlock([
 
 
-                  _contractRow("Contact d'urgence", saleData["emergency_name"]?.toString() ?? "Non renseign"),
+                  _contractRow("Contact d'urgence", saleData["emergency_name"]?.toString() ?? "Non renseigné"),
 
 
-                  _contractRow("Relation", saleData["emergency_relation"]?.toString() ?? "Non renseign"),
+                  _contractRow("Relation", saleData["emergency_relation"]?.toString() ?? "Non renseigné"),
 
 
-                  _contractRow("Téléphone Urgence", saleData["emergency_phone"]?.toString() ?? "Non renseign"),
+                  _contractRow("Téléphone Urgence", saleData["emergency_phone"]?.toString() ?? "Non renseigné"),
 
 
                 ]),
@@ -292,10 +292,10 @@ class SalesContractPage extends StatelessWidget {
                   _contractRow("Modèle Canne", saleData["version_canne"]?.toString() ?? "SIRIUS"),
 
 
-                  _contractRow("Numéro SIM", saleData["sim_de_la_canne"]?.toString() ?? "Non renseign"),
+                  _contractRow("Numéro SIM", saleData["sim_de_la_canne"]?.toString() ?? "Non renseigné"),
 
 
-                  _contractRow("Prix Équipement", "${saleData['payment_info']?['cane_price'] ?? 'Non renseign'} TND"),
+                  _contractRow("Prix Équipement", "${saleData['payment_info']?['cane_price'] ?? 'Non renseigné'} TND"),
 
 
                   _contractRow("Durée Abonnement", "${saleData['payment_info']?['subscription_duration_months'] ?? '0'} mois"),
@@ -307,7 +307,7 @@ class SalesContractPage extends StatelessWidget {
                   _contractRow("Prix Abonnement", "${saleData['payment_info']?['subscription_price'] ?? '0'} TND"),
 
 
-                  _contractRow("TOTAL TTC", "${saleData['payment_info']?['total_amount'] ?? 'Non renseign'} TND"),
+                  _contractRow("TOTAL TTC", "${saleData['payment_info']?['total_amount'] ?? 'Non renseigné'} TND"),
 
 
                 ]),
@@ -325,7 +325,7 @@ class SalesContractPage extends StatelessWidget {
                 _infoBlock([
 
 
-                  _contractRow("Mode de règlement", saleData['payment_info']?['method']?.toString() ?? "Non renseign"),
+                  _contractRow("Mode de règlement", saleData['payment_info']?['method']?.toString() ?? "Non renseigné"),
 
 
                   _contractRow("Garantie Matériel", "2 ans (Pièces et main d'œuvre)"),
@@ -340,7 +340,7 @@ class SalesContractPage extends StatelessWidget {
                 const Text(
 
 
-                  "Le client reconnait avoir recu le produit en bon etat. La garantie couvre uniquement les defauts de fabrication.",
+                  "Le client reconnaît avoir reçu le produit en bon état. La garantie couvre uniquement les défauts de fabrication.",
 
 
                   style: TextStyle(fontSize: 12, height: 1.6, color: Colors.black87),
@@ -364,7 +364,7 @@ class SalesContractPage extends StatelessWidget {
                     const SizedBox(width: 40),
 
 
-                    const Expanded(child: _SignatureBlock(title: "Representant SIRIUS")),
+                    const Expanded(child: _SignatureBlock(title: "Représentant SIRIUS")),
 
 
                   ],

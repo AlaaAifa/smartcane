@@ -48,6 +48,7 @@ class _DashboardPageState extends State<DashboardPage>
   List<Map<String, dynamic>> _renters = [];
   int _sosCount = 0;
   int _helpCount = 0;
+  StreamSubscription? _alertSub;
 
   @override
   void initState() {
@@ -60,12 +61,31 @@ class _DashboardPageState extends State<DashboardPage>
     )..repeat(reverse: true);
 
     _loadData();
+    _listenToAlerts();
+  }
+
+  void _listenToAlerts() {
+    _alertSub = AlertService.getActiveAlertStream().listen((alertData) {
+      if (!mounted) return;
+      setState(() {
+        if (alertData == null) {
+          activeAlerts = [];
+          _sosCount = 0;
+          _helpCount = 0;
+        } else {
+          final alert = Map<String, dynamic>.from(alertData);
+          activeAlerts = [alert];
+          _sosCount = alert["type"] == "SOS" ? 1 : 0;
+          _helpCount = alert["type"] == "HELP" ? 1 : 0;
+        }
+      });
+    });
   }
 
   @override
   void dispose() {
     _pulseCtrl.dispose();
-
+    _alertSub?.cancel();
     super.dispose();
   }
 
@@ -95,7 +115,12 @@ class _DashboardPageState extends State<DashboardPage>
     setState(() {
       users = clientUsers;
       activeRentals = r;
-      activeAlerts = a;
+      // Ne pas écraser si une alerte temps réel est déjà présente
+      if (activeAlerts.isEmpty) {
+        activeAlerts = a;
+        _sosCount = a.where((al) => al["type"] == "SOS").length;
+        _helpCount = a.where((al) => al["type"] == "HELP").length;
+      }
       historyAlerts = h;
       staffList = s;
       _buyers = buyers;
@@ -199,6 +224,36 @@ class _DashboardPageState extends State<DashboardPage>
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            StreamBuilder<Map<String, dynamic>?>(
+              stream: AlertService.getActiveAlertStream(),
+              builder: (context, snapshot) {
+                if (snapshot.hasError) {
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 20),
+                    padding: const EdgeInsets.all(12),
+                    color: Colors.red.withOpacity(0.1),
+                    child: Text("❌ Erreur Firebase: ${snapshot.error}", style: const TextStyle(color: Colors.red, fontSize: 10)),
+                  );
+                }
+                
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Padding(
+                    padding: EdgeInsets.only(bottom: 20),
+                    child: LinearProgressIndicator(minHeight: 2, backgroundColor: Colors.transparent, color: AppTheme.accent),
+                  );
+                }
+
+                if (snapshot.hasData && snapshot.data != null) {
+                  return Column(
+                    children: [
+                      _buildLiveAlertBanner(snapshot.data!),
+                      const SizedBox(height: 32),
+                    ],
+                  );
+                }
+                return const SizedBox.shrink();
+              },
+            ),
             _buildPageHeader(),
             const SizedBox(height: 40),
             _buildStatCards(),
@@ -1521,7 +1576,7 @@ class _DashboardPageState extends State<DashboardPage>
     final Color cardColor = sos > 0
         ? AppTheme.sosRed
         : help > 0
-        ? AppTheme.accent
+        ? const Color(0xFFF97316) // Orange vif
         : const Color(0xFF94A3B8);
 
     return Expanded(
@@ -1800,6 +1855,74 @@ class _DashboardPageState extends State<DashboardPage>
 
     return '+216$digits';
   }
+
+  Widget _buildLiveAlertBanner(Map<String, dynamic> alert) {
+    final type = (alert["type"]?.toString() ?? "SOS").toUpperCase();
+    final isSOS = type == "SOS";
+    final color = isSOS ? AppTheme.sosRed : AppTheme.accent;
+    
+    // Extraction sécurisée du nom
+    String name = "Utilisateur Inconnu";
+    if (alert["user_name"] != null) {
+      name = alert["user_name"];
+    } else if (alert["user"] != null && alert["user"]["name"] != null) {
+      name = alert["user"]["name"];
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withOpacity(0.3), width: 2),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: color,
+              shape: BoxShape.circle,
+              boxShadow: [BoxShadow(color: color.withOpacity(0.5), blurRadius: 15, spreadRadius: 2)],
+            ),
+            child: Icon(isSOS ? Icons.warning_rounded : Icons.help_outline_rounded, color: Colors.white, size: 28),
+          ),
+          const SizedBox(width: 24),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  "ALERTE ${alert["type"]} ACTIVE !",
+                  style: TextStyle(color: color, fontWeight: FontWeight.w900, fontSize: 13, letterSpacing: 1.5),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  "Incident détecté pour $name",
+                  style: const TextStyle(color: AppTheme.primary, fontWeight: FontWeight.w900, fontSize: 20),
+                ),
+              ],
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              // On nettoie la bannière du dashboard mais l'alerte reste ACTIVE dans la page Alertes
+              await AlertService.dismissActiveAlertBanner();
+              widget.onNavigate("/alerts");
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: color,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              elevation: 0,
+            ),
+            child: const Text("INTERVENIR MAINTENANT", style: TextStyle(fontWeight: FontWeight.w900, fontSize: 12)),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _HoverGlowButton extends StatefulWidget {
@@ -1897,7 +2020,6 @@ class _HoverAlertCardState extends State<_HoverAlertCard> {
 
   @override
   Widget build(BuildContext context) {
-    final Color hoverColor = widget.cardColor;
     return MouseRegion(
       cursor: SystemMouseCursors.click,
       onEnter: (_) => setState(() => _hovered = true),
@@ -1908,18 +2030,20 @@ class _HoverAlertCardState extends State<_HoverAlertCard> {
           duration: const Duration(milliseconds: 200),
           padding: const EdgeInsets.all(24),
           decoration: BoxDecoration(
-            color: _hovered ? hoverColor.withOpacity(0.06) : AppTheme.bgCard,
+            color: _hovered
+                ? widget.cardColor.withOpacity(0.06)
+                : AppTheme.bgCard,
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
               color: _hovered
-                  ? hoverColor.withOpacity(0.5)
+                  ? widget.cardColor.withOpacity(0.5)
                   : Colors.grey.withOpacity(0.1),
               width: _hovered ? 1.5 : 1,
             ),
             boxShadow: [
               if (_hovered)
                 BoxShadow(
-                  color: hoverColor.withOpacity(0.15),
+                  color: widget.cardColor.withOpacity(0.15),
                   blurRadius: 24,
                   spreadRadius: 2,
                   offset: const Offset(0, 4),
@@ -1935,24 +2059,18 @@ class _HoverAlertCardState extends State<_HoverAlertCard> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: widget.cardColor.withOpacity(_hovered ? 0.15 : 0.1),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Icon(
-                      Icons.notifications_active_rounded,
-                      color: widget.cardColor,
-                      size: 24,
-                    ),
-                  ),
-
-                ],
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: widget.cardColor.withOpacity(_hovered ? 0.15 : 0.08),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(
+                  Icons.notifications_active_rounded,
+                  color: widget.cardColor,
+                  size: 24,
+                ),
               ),
               const SizedBox(height: 24),
               Text(
@@ -1960,7 +2078,7 @@ class _HoverAlertCardState extends State<_HoverAlertCard> {
                 style: TextStyle(
                   fontSize: 36,
                   fontWeight: FontWeight.w900,
-                  color: _hovered ? hoverColor : AppTheme.primary,
+                  color: _hovered ? widget.cardColor : AppTheme.primary,
                   letterSpacing: -1,
                 ),
               ),
@@ -1968,18 +2086,18 @@ class _HoverAlertCardState extends State<_HoverAlertCard> {
               Text(
                 "Alertes Actives",
                 style: TextStyle(
-                  color: _hovered ? hoverColor : AppTheme.primary,
+                  color: _hovered ? widget.cardColor : AppTheme.primary,
                   fontWeight: FontWeight.w800,
                   fontSize: 14,
                 ),
               ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  _alertBadge("${widget.sos} SOS", AppTheme.sosRed),
-                  const SizedBox(width: 8),
-                  _alertBadge("${widget.help} HELP", AppTheme.accent),
-                ],
+              Text(
+                "${widget.sos} SOS / ${widget.help} HELP",
+                style: const TextStyle(
+                  color: Color(0xFF94A3B8),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                ),
               ),
             ],
           ),

@@ -33,6 +33,7 @@ void main() async {
       ),
     );
     print("DEBUG: Firebase connecté avec succès !");
+    AlertService.init();
   } catch (e) {
     print("DEBUG: Erreur Firebase: $e");
   }

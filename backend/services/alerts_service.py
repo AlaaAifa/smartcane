@@ -50,3 +50,13 @@ def delete_alert(db: Session, alert_id: str):
     db.delete(db_alert)
     db.commit()
     return True
+
+
+def clear_alert_history(db: Session):
+    try:
+        db.query(models.Alert).filter(models.Alert.status == "resolved").delete()
+        db.commit()
+        return True
+    except Exception:
+        db.rollback()
+        return False
